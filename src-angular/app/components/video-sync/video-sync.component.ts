@@ -1,0 +1,243 @@
+/**
+ * Bridge Video Sync Module - Component
+ */
+
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core'
+import { VideoSyncService } from '../../core/services/video-sync.service'
+import { CatalogService } from '../../core/services/catalog.service'
+import { 
+  YouTubeSearchResult, 
+  VideoDownloadProgress,
+  ChartVideoMatch 
+} from '../../../../src-shared/interfaces/video-sync.interface.js'
+
+@Component({
+  selector: 'app-video-sync',
+  templateUrl: './video-sync.component.html',
+  standalone: false,
+})
+export class VideoSyncComponent implements OnInit {
+  // Tool status
+  toolsAvailable: { ytDlp: boolean; ffmpeg: boolean } | null = null
+  checkingTools = true
+
+  // Charts without videos
+  chartsMissingVideo: ChartVideoMatch[] = []
+  filteredCharts: ChartVideoMatch[] = []
+  loadingCharts = false
+
+  // Filter/sort state
+  filterQuery = ''
+  filterArtist = ''
+  sortField: 'artist' | 'name' = 'artist'
+  sortDirection: 'asc' | 'desc' = 'asc'
+  artistOptions: string[] = []
+
+  // Currently selected chart
+  selectedChart: ChartVideoMatch | null = null
+
+  // Search
+  searchQuery = ''
+  searchResults: YouTubeSearchResult[] = []
+  isSearching = false
+  searchError: string | null = null
+
+  // Download
+  selectedVideo: YouTubeSearchResult | null = null
+  downloadProgress: VideoDownloadProgress | null = null
+  isDownloading = false
+
+  // View mode
+  viewMode: 'list' | 'search' = 'list'
+
+  constructor(
+    private videoSyncService: VideoSyncService,
+    private catalogService: CatalogService,
+    private ref: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
+    // Subscribe to observables
+    this.videoSyncService.toolsAvailable$.subscribe(tools => {
+      this.toolsAvailable = tools
+      this.checkingTools = false
+      this.ref.detectChanges()
+    })
+
+    this.videoSyncService.downloadProgress$.subscribe(progress => {
+      this.downloadProgress = progress
+      this.ref.detectChanges()
+
+      // Refresh chart list when download completes
+      if (progress?.phase === 'complete') {
+        this.loadChartsMissingVideo()
+        this.catalogService.refreshStats()
+      }
+    })
+
+    this.videoSyncService.isDownloading$.subscribe(downloading => {
+      this.isDownloading = downloading
+      this.ref.detectChanges()
+    })
+
+    // Initial load
+    this.loadChartsMissingVideo()
+  }
+
+  async loadChartsMissingVideo(): Promise<void> {
+    this.loadingCharts = true
+    this.ref.detectChanges()
+
+    try {
+      this.chartsMissingVideo = await this.videoSyncService.getChartsMissingVideo(10000)
+      this.buildArtistOptions()
+      this.applyFilter()
+    } catch (err) {
+      console.error('Failed to load charts:', err)
+    } finally {
+      this.loadingCharts = false
+      this.ref.detectChanges()
+    }
+  }
+
+  buildArtistOptions(): void {
+    const artists = new Set<string>()
+    this.chartsMissingVideo.forEach(c => {
+      if (c.chartArtist) artists.add(c.chartArtist)
+    })
+    this.artistOptions = Array.from(artists).sort((a, b) => 
+      a.toLowerCase().localeCompare(b.toLowerCase())
+    )
+  }
+
+  applyFilter(): void {
+    let result = [...this.chartsMissingVideo]
+
+    // Text filter
+    if (this.filterQuery) {
+      const query = this.filterQuery.toLowerCase()
+      result = result.filter(c => 
+        c.chartName.toLowerCase().includes(query) ||
+        c.chartArtist.toLowerCase().includes(query)
+      )
+    }
+
+    // Artist filter
+    if (this.filterArtist) {
+      result = result.filter(c => c.chartArtist === this.filterArtist)
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      const aVal = this.sortField === 'artist' ? a.chartArtist : a.chartName
+      const bVal = this.sortField === 'artist' ? b.chartArtist : b.chartName
+      const cmp = aVal.toLowerCase().localeCompare(bVal.toLowerCase())
+      return this.sortDirection === 'asc' ? cmp : -cmp
+    })
+
+    this.filteredCharts = result
+    this.ref.detectChanges()
+  }
+
+  toggleSortDirection(): void {
+    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc'
+    this.applyFilter()
+  }
+
+  clearFilters(): void {
+    this.filterQuery = ''
+    this.filterArtist = ''
+    this.applyFilter()
+  }
+
+  selectChart(chart: ChartVideoMatch): void {
+    this.selectedChart = chart
+    this.searchQuery = chart.suggestedQuery
+    this.searchResults = []
+    this.selectedVideo = null
+    this.searchError = null
+    this.viewMode = 'search'
+    this.ref.detectChanges()
+  }
+
+  async search(): Promise<void> {
+    if (!this.searchQuery.trim()) return
+
+    this.isSearching = true
+    this.searchError = null
+    this.searchResults = []
+    this.ref.detectChanges()
+
+    try {
+      this.searchResults = await this.videoSyncService.searchYouTube(this.searchQuery)
+    } catch (err) {
+      this.searchError = `Search failed: ${err}`
+    } finally {
+      this.isSearching = false
+      this.ref.detectChanges()
+    }
+  }
+
+  selectVideo(video: YouTubeSearchResult): void {
+    this.selectedVideo = video
+    this.ref.detectChanges()
+  }
+
+  async downloadVideo(): Promise<void> {
+    if (!this.selectedChart || !this.selectedVideo) return
+
+    try {
+      await this.videoSyncService.downloadVideo({
+        chartId: this.selectedChart.chartId,
+        videoId: this.selectedVideo.videoId,
+        outputPath: this.selectedChart.chartPath,
+      })
+
+      // Go back to list after successful download
+      this.goBackToList()
+    } catch (err) {
+      console.error('Download failed:', err)
+    }
+  }
+
+  cancelDownload(): void {
+    if (this.selectedVideo) {
+      this.videoSyncService.cancelDownload(this.selectedVideo.videoId)
+    }
+  }
+
+  goBackToList(): void {
+    this.viewMode = 'list'
+    this.selectedChart = null
+    this.selectedVideo = null
+    this.searchResults = []
+    this.searchQuery = ''
+    this.searchError = null
+    this.ref.detectChanges()
+  }
+
+  formatDuration(seconds: number | null): string {
+    if (!seconds) return '--:--'
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  openYtDlpInstall(): void {
+    window.electron.emit.openUrl('https://github.com/yt-dlp/yt-dlp#installation')
+  }
+
+  openFfmpegInstall(): void {
+    window.electron.emit.openUrl('https://ffmpeg.org/download.html')
+  }
+
+  previewVideo(video: YouTubeSearchResult): void {
+    window.electron.emit.openUrl(`https://www.youtube.com/watch?v=${video.videoId}`)
+  }
+
+  refreshTools(): void {
+    this.checkingTools = true
+    this.ref.detectChanges()
+    this.videoSyncService.checkTools()
+  }
+}
