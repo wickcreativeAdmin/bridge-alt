@@ -178,6 +178,18 @@
       </button>
     </div>
 
+    <!-- Download error -->
+    <div class="alert alert-error mb-4" *ngIf="downloadError">
+      <i class="bi bi-exclamation-circle"></i>
+      <div class="flex-1">
+        <div class="font-semibold">Download Failed</div>
+        <div class="text-sm whitespace-pre-wrap max-h-32 overflow-y-auto">{{downloadError}}</div>
+      </div>
+      <button class="btn btn-sm btn-ghost" (click)="downloadError = null">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+
     <!-- Search results -->
     <div class="flex-1 overflow-y-auto scrollbar scrollbar-w-2 scrollbar-track-base-300 scrollbar-thumb-neutral scrollbar-thumb-rounded-full">
       <div class="space-y-2">

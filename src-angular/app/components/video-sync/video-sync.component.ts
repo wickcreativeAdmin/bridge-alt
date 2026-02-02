@@ -49,6 +49,7 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
   selectedVideo: YouTubeSearchResult | null = null
   downloadProgress: VideoDownloadProgress | null = null
   isDownloading = false
+  downloadError: string | null = null
 
   // View mode
   viewMode: 'list' | 'search' = 'list'
@@ -77,6 +78,12 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
         this.loadChartsMissingVideo()
         this.catalogService.refreshCharts()
         this.catalogService.refreshStats()
+      }
+      
+      // Handle download errors
+      if (progress?.phase === 'error') {
+        this.downloadError = progress.message
+        this.ref.detectChanges()
       }
     })
 
@@ -232,6 +239,10 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
   async downloadVideo(): Promise<void> {
     if (!this.selectedChart || !this.selectedVideo) return
 
+    // Clear any previous error
+    this.downloadError = null
+    this.ref.detectChanges()
+
     try {
       await this.videoSyncService.downloadVideo({
         chartId: this.selectedChart.chartId,
@@ -243,6 +254,7 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
       this.goBackToList()
     } catch (err) {
       console.error('Download failed:', err)
+      // Error is already handled via downloadProgress subscription
     }
   }
 
@@ -259,6 +271,7 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
     this.searchResults = []
     this.searchQuery = ''
     this.searchError = null
+    this.downloadError = null
     this.ref.detectChanges()
   }
 
