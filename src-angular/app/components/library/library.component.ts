@@ -4,6 +4,7 @@
  */
 
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core'
+import { Router } from '@angular/router'
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs'
 import { ChartRecord, CatalogStats, ScanProgress, CatalogFilter } from '../../../../src-shared/interfaces/catalog.interface.js'
 import { CatalogService } from '../../core/services/catalog.service'
@@ -49,6 +50,7 @@ export class LibraryComponent implements OnInit {
   constructor(
     private catalogService: CatalogService,
     private ref: ChangeDetectorRef,
+    private router: Router,
   ) {}
 
   ngOnInit(): void {
@@ -528,5 +530,59 @@ export class LibraryComponent implements OnInit {
       this.removalError = `Error: ${err}`
     }
     this.ref.detectChanges()
+  }
+
+  async deleteLyrics(chart: ChartRecord): Promise<void> {
+    if (!confirm(`Delete lyrics from "${chart.artist} - ${chart.name}"?`)) return
+    
+    try {
+      const result = await window.electron.invoke.lyricsDelete(chart.id)
+      if (result.success) {
+        await this.catalogService.refreshCharts()
+        await this.catalogService.refreshStats()
+      } else {
+        this.removalError = result.error || 'Failed to delete lyrics'
+      }
+    } catch (err) {
+      this.removalError = `Error: ${err}`
+    }
+    this.ref.detectChanges()
+  }
+
+  // Navigation methods - go to specific tabs with chart pre-selected
+  goToVideo(chart: ChartRecord): void {
+    // Store selected chart info for video tab to pick up
+    sessionStorage.setItem('selectedChartForVideo', JSON.stringify({
+      id: chart.id,
+      name: chart.name,
+      artist: chart.artist,
+      path: chart.path,
+      songLength: chart.songLength
+    }))
+    this.router.navigate(['/video'])
+  }
+
+  goToArt(chart: ChartRecord, type: 'album' | 'background'): void {
+    sessionStorage.setItem('selectedChartForArt', JSON.stringify({
+      id: chart.id,
+      name: chart.name,
+      artist: chart.artist,
+      album: chart.album,
+      path: chart.path,
+      type
+    }))
+    this.router.navigate(['/art'])
+  }
+
+  goToLyrics(chart: ChartRecord): void {
+    sessionStorage.setItem('selectedChartForLyrics', JSON.stringify({
+      id: chart.id,
+      name: chart.name,
+      artist: chart.artist,
+      album: chart.album,
+      path: chart.path,
+      chartType: chart.chartType
+    }))
+    this.router.navigate(['/lyrics'])
   }
 }

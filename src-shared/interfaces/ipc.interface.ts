@@ -214,7 +214,7 @@ export interface IpcInvokeEvents {
 		output: LyricsSearchResult | null
 	}
 	lyricsDownload: {
-		input: { chartId: number; lyricsId: number; outputPath: string; chartType: 'mid' | 'chart' | 'sng' | null }
+		input: { chartId: number; lyricsId: number; outputPath: string; chartType: 'mid' | 'chart' | 'sng' | null; offsetMs?: number }
 		output: { success: boolean; error?: string }
 	}
 	lyricsGetChartsMissing: {
@@ -228,6 +228,14 @@ export interface IpcInvokeEvents {
 	lyricsCheckChart: {
 		input: number
 		output: { hasLyrics: boolean }
+	}
+	lyricsDelete: {
+		input: number
+		output: { success: boolean; error?: string }
+	}
+	lyricsGetAudioPath: {
+		input: string
+		output: { dataUrl: string; vocalStartMs: number | null; hasVocalsTrack: boolean } | null
 	}
 }
 

@@ -56,6 +56,7 @@ export async function lyricsDownload(input: {
   lyricsId: number
   outputPath: string
   chartType: 'mid' | 'chart' | 'sng' | null
+  offsetMs?: number
 }): Promise<{ success: boolean; error?: string }> {
   initLyricsService()
   
@@ -66,7 +67,8 @@ export async function lyricsDownload(input: {
     input.chartId,
     input.lyricsId,
     input.outputPath,
-    input.chartType
+    input.chartType,
+    input.offsetMs ?? 0
   )
 
   if (result.success) {
@@ -175,4 +177,36 @@ export async function lyricsCheckChart(chartId: number): Promise<{ hasLyrics: bo
   return {
     hasLyrics: chart?.hasLyrics ?? false,
   }
+}
+
+/**
+ * Delete lyrics from a chart file
+ */
+export async function lyricsDelete(chartId: number): Promise<{ success: boolean; error?: string }> {
+  const db = getCatalogDb()
+  const service = getLyricsService()
+  
+  const chart = db.getChart(chartId)
+  if (!chart) {
+    return { success: false, error: 'Chart not found' }
+  }
+
+  try {
+    const result = await service.deleteLyrics(chart.path, chart.chartType)
+    if (result.success) {
+      db.updateChartLyricsStatus(chartId, false)
+    }
+    return result
+  } catch (err) {
+    return { success: false, error: `Error deleting lyrics: ${err}` }
+  }
+}
+
+/**
+ * Get audio file path for a chart (for sync tool preview)
+ * Returns as base64 data URL for playback in renderer
+ */
+export async function lyricsGetAudioPath(chartPath: string): Promise<{ dataUrl: string; vocalStartMs: number | null; hasVocalsTrack: boolean } | null> {
+  const service = getLyricsService()
+  return service.getAudioAsDataUrl(chartPath)
 }

@@ -199,6 +199,7 @@
           <th class="w-8 text-center" title="Has Video">V</th>
           <th class="w-8 text-center" title="Has Background">B</th>
           <th class="w-8 text-center" title="Has Album Art">A</th>
+          <th class="w-8 text-center" title="Has Lyrics">L</th>
           <th class="w-14"></th>
         </tr>
       </thead>
@@ -222,15 +223,19 @@
           <td class="text-center"><span class="badge badge-xs" [class.badge-success]="chart.chartType === 'mid'" [class.badge-warning]="chart.chartType === 'chart'">{{chart.chartType || '?'}}</span></td>
           <td class="text-center">
             <button *ngIf="chart.hasVideo" class="btn btn-xs btn-ghost text-success" (click)="deleteVideo(chart)" title="Has video - click to delete">✓</button>
-            <span *ngIf="!chart.hasVideo" class="text-error text-xs">✗</span>
+            <button *ngIf="!chart.hasVideo" class="btn btn-xs btn-ghost text-error" (click)="goToVideo(chart)" title="No video - click to add">✗</button>
           </td>
           <td class="text-center">
             <button *ngIf="chart.hasBackground" class="btn btn-xs btn-ghost text-success" (click)="deleteBackground(chart)" title="Has background - click to delete">✓</button>
-            <span *ngIf="!chart.hasBackground" class="text-error text-xs">✗</span>
+            <button *ngIf="!chart.hasBackground" class="btn btn-xs btn-ghost text-error" (click)="goToArt(chart, 'background')" title="No background - click to add">✗</button>
           </td>
           <td class="text-center">
             <button *ngIf="chart.hasAlbumArt" class="btn btn-xs btn-ghost text-success" (click)="deleteAlbumArt(chart)" title="Has album art - click to delete">✓</button>
-            <span *ngIf="!chart.hasAlbumArt" class="text-error text-xs">✗</span>
+            <button *ngIf="!chart.hasAlbumArt" class="btn btn-xs btn-ghost text-error" (click)="goToArt(chart, 'album')" title="No album art - click to add">✗</button>
+          </td>
+          <td class="text-center">
+            <button *ngIf="chart.hasLyrics" class="btn btn-xs btn-ghost text-success" (click)="deleteLyrics(chart)" title="Has lyrics - click to delete">✓</button>
+            <button *ngIf="!chart.hasLyrics" class="btn btn-xs btn-ghost text-error" (click)="goToLyrics(chart)" title="No lyrics - click to add">✗</button>
           </td>
           <td>
             <div class="flex gap-0.5">

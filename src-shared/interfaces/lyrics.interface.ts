@@ -42,4 +42,5 @@ export interface LyricsDownloadOptions {
   lyricsId: number
   outputPath: string
   chartType: 'mid' | 'chart' | 'sng' | null
+  offsetMs?: number  // Timing offset in milliseconds (positive = delay lyrics, negative = advance)
 }

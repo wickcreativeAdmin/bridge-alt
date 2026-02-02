@@ -72,6 +72,8 @@ const electronApi: ContextBridgeApi = {
 		lyricsGetChartsMissing: getInvoker('lyricsGetChartsMissing'),
 		lyricsBatchDownload: getInvoker('lyricsBatchDownload'),
 		lyricsCheckChart: getInvoker('lyricsCheckChart'),
+		lyricsDelete: getInvoker('lyricsDelete'),
+		lyricsGetAudioPath: getInvoker('lyricsGetAudioPath'),
 	},
 	emit: {
 		download: getEmitter('download'),

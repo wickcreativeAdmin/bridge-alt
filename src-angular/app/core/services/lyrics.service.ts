@@ -57,7 +57,8 @@ export class LyricsService {
     chartId: number,
     lyricsId: number,
     outputPath: string,
-    chartType: 'mid' | 'chart' | 'sng' | null
+    chartType: 'mid' | 'chart' | 'sng' | null,
+    offsetMs: number = 0
   ): Promise<{ success: boolean; error?: string }> {
     try {
       return await window.electron.invoke.lyricsDownload({
@@ -65,6 +66,7 @@ export class LyricsService {
         lyricsId,
         outputPath,
         chartType,
+        offsetMs,
       })
     } catch (err) {
       console.error('Download lyrics failed:', err)
@@ -96,6 +98,15 @@ export class LyricsService {
     } catch (err) {
       console.error('Check chart lyrics failed:', err)
       return { hasLyrics: false }
+    }
+  }
+
+  async getChartAudioPath(chartPath: string): Promise<{ dataUrl: string; vocalStartMs: number | null; hasVocalsTrack: boolean } | null> {
+    try {
+      return await window.electron.invoke.lyricsGetAudioPath(chartPath)
+    } catch (err) {
+      console.error('Get chart audio path failed:', err)
+      return null
     }
   }
 }

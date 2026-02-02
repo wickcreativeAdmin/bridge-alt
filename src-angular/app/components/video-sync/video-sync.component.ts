@@ -81,7 +81,33 @@ export class VideoSyncComponent implements OnInit {
     })
 
     // Initial load
-    this.loadChartsMissingVideo()
+    this.loadChartsMissingVideo().then(() => {
+      // Check if we were navigated here with a pre-selected chart
+      this.checkForPreselectedChart()
+    })
+  }
+
+  private checkForPreselectedChart(): void {
+    const stored = sessionStorage.getItem('selectedChartForVideo')
+    if (stored) {
+      sessionStorage.removeItem('selectedChartForVideo')
+      try {
+        const chartData = JSON.parse(stored)
+        // Create a ChartVideoMatch from the stored data
+        const chart: ChartVideoMatch = {
+          chartId: chartData.id,
+          chartName: chartData.name,
+          chartArtist: chartData.artist,
+          chartPath: chartData.path,
+          songLength: chartData.songLength,
+          suggestedQuery: `${chartData.artist} - ${chartData.name} official video`
+        }
+        // Select this chart and go to search view
+        this.selectChart(chart)
+      } catch (err) {
+        console.error('Failed to parse pre-selected chart:', err)
+      }
+    }
   }
 
   async loadChartsMissingVideo(): Promise<void> {

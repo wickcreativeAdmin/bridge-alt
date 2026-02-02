@@ -79,7 +79,41 @@ export class ArtStudioComponent implements OnInit {
       this.ref.detectChanges()
     })
 
-    this.loadCharts()
+    this.loadCharts().then(() => {
+      // Check if we were navigated here with a pre-selected chart
+      this.checkForPreselectedChart()
+    })
+  }
+
+  private checkForPreselectedChart(): void {
+    const stored = sessionStorage.getItem('selectedChartForArt')
+    if (stored) {
+      sessionStorage.removeItem('selectedChartForArt')
+      try {
+        const chartData = JSON.parse(stored)
+        // Go to the appropriate view mode based on type
+        if (chartData.type === 'album') {
+          this.setViewMode('albumArt')
+          // Create a ChartArtMatch and select it
+          const chart: ChartArtMatch = {
+            chartId: chartData.id,
+            chartName: chartData.name,
+            chartArtist: chartData.artist,
+            chartAlbum: chartData.album || '',
+            chartPath: chartData.path,
+            hasBackground: false,
+            hasAlbumArt: false,
+            suggestedQuery: `${chartData.artist} ${chartData.album || chartData.name}`
+          }
+          this.selectChart(chart)
+        } else if (chartData.type === 'background') {
+          this.setViewMode('backgrounds')
+          // For backgrounds, just navigate to the view - can't pre-select single chart there
+        }
+      } catch (err) {
+        console.error('Failed to parse pre-selected chart:', err)
+      }
+    }
   }
 
   async loadCharts(): Promise<void> {
