@@ -172,16 +172,26 @@ class ChartScanner extends EventEmitter<ScannerEvents> {
       else if (lower.endsWith('.sng')) chartType = 'sng'
     }
 
+    // Check if this is from an official charter (Harmonix = Rock Band, Neversoft = Guitar Hero)
+    // These always have all difficulties (EMHX)
+    const charterName = (songIni.charter || songIni.frets || '').toLowerCase()
+    const isOfficialCharter = charterName.includes('harmonix') || 
+                              charterName.includes('neversoft') ||
+                              charterName.includes('vicarious visions') ||
+                              charterName.includes('budcat') ||
+                              charterName.includes('freestyle games')
+
     // Detect if this is a GH3-style encrypted MIDI
     // GH3 charts have `icon = gh3` or `multiplier_note` in song.ini
     const isGH3Style = songIni.icon === 'gh3' || 
                        songIni.multiplier_note !== undefined ||
-                       (songIni as any).gh3_unlock !== undefined
+                       (songIni as any).gh3_unlock !== undefined ||
+                       isOfficialCharter
 
     // Parse chart file to detect available difficulty levels
     let diffLevels = await this.parseChartDifficulties(assets.chart, chartType)
 
-    // For GH3-style encrypted MIDIs, if parsing returned minimal results but
+    // For GH3-style encrypted MIDIs or official charters, if parsing returned minimal results but
     // we know instruments exist (from song.ini diff_ fields or track detection),
     // assume all standard difficulties (E/M/H/X) are available
     if (isGH3Style && chartType === 'mid') {
@@ -208,6 +218,22 @@ class ChartScanner extends EventEmitter<ScannerEvents> {
     const hasGHL = diffLevels.ghlGuitar.length > 0 || diffLevels.ghlBass.length > 0 || 
                    (diff_guitarghl !== null && diff_guitarghl >= -1) || 
                    (diff_bassghl !== null && diff_bassghl >= -1)
+
+    // For official charters, force all difficulties for any instrument that exists
+    // These are always complete charts from the original games
+    if (isOfficialCharter) {
+      const allDiffs = ['e', 'm', 'h', 'x']
+      if (hasGuitar) diffLevels.guitar = allDiffs
+      if (hasBass) diffLevels.bass = allDiffs
+      if (hasDrums) diffLevels.drums = allDiffs
+      if (hasKeys) diffLevels.keys = allDiffs
+      if (hasVocals) diffLevels.vocals = allDiffs
+      if (hasRhythm) diffLevels.rhythm = allDiffs
+      if (hasGHL) {
+        diffLevels.ghlGuitar = allDiffs
+        diffLevels.ghlBass = allDiffs
+      }
+    }
 
     return {
       path: folderPath,
@@ -580,7 +606,7 @@ class ChartScanner extends EventEmitter<ScannerEvents> {
   }
 
   /**
-   * Handle GH3-style encrypted MIDI files
+   * Handle GH3-style encrypted MIDI files and official charter charts
    * These MIDIs can't be parsed normally, so we detect instruments from
    * track names and assume all difficulties (E/M/H/X) are present
    */
@@ -601,18 +627,20 @@ class ChartScanner extends EventEmitter<ScannerEvents> {
     const result = { ...existingResult }
     const allDiffs = ['e', 'm', 'h', 'x']
     
-    // If we already parsed valid difficulties, use those
-    const hasValidParse = 
-      result.guitar.length > 1 || 
-      result.bass.length > 1 || 
-      result.drums.length > 1 ||
-      result.rhythm.length > 1
+    // If we already parsed ALL difficulties for an instrument, keep those
+    // But if we only found 1-2 difficulties, it's likely a parsing issue with encrypted MIDIs
+    const hasCompleteParse = 
+      result.guitar.length >= 3 || 
+      result.bass.length >= 3 || 
+      result.drums.length >= 3 ||
+      result.rhythm.length >= 3
 
-    if (hasValidParse) {
+    if (hasCompleteParse) {
       return result
     }
 
-    // For GH3 MIDIs, detect which instrument tracks exist and assume all difficulties
+    // For GH3 MIDIs / official charters, detect which instrument tracks exist 
+    // and assume all difficulties are present
     if (midiPath) {
       try {
         const buffer = await fs.promises.readFile(midiPath)
@@ -644,24 +672,24 @@ class ChartScanner extends EventEmitter<ScannerEvents> {
       }
     }
 
-    // Also use song.ini diff_ fields as hints
+    // Also use song.ini diff_ fields as hints for instruments we didn't detect from tracks
     // diff_* = -1 means "auto-detect" or "all difficulties present"
-    if (songIni.diff_guitar !== undefined && songIni.diff_guitar >= -1 && result.guitar.length === 0) {
+    if (songIni.diff_guitar !== undefined && songIni.diff_guitar >= -1 && result.guitar.length < 4) {
       result.guitar = allDiffs
     }
-    if (songIni.diff_bass !== undefined && songIni.diff_bass >= -1 && result.bass.length === 0) {
+    if (songIni.diff_bass !== undefined && songIni.diff_bass >= -1 && result.bass.length < 4) {
       result.bass = allDiffs
     }
-    if (songIni.diff_drums !== undefined && songIni.diff_drums >= -1 && result.drums.length === 0) {
+    if (songIni.diff_drums !== undefined && songIni.diff_drums >= -1 && result.drums.length < 4) {
       result.drums = allDiffs
     }
-    if (songIni.diff_keys !== undefined && songIni.diff_keys >= -1 && result.keys.length === 0) {
+    if (songIni.diff_keys !== undefined && songIni.diff_keys >= -1 && result.keys.length < 4) {
       result.keys = allDiffs
     }
-    if (songIni.diff_vocals !== undefined && songIni.diff_vocals >= -1 && result.vocals.length === 0) {
+    if (songIni.diff_vocals !== undefined && songIni.diff_vocals >= -1 && result.vocals.length < 4) {
       result.vocals = allDiffs
     }
-    if (songIni.diff_rhythm !== undefined && songIni.diff_rhythm >= -1 && result.rhythm.length === 0) {
+    if (songIni.diff_rhythm !== undefined && songIni.diff_rhythm >= -1 && result.rhythm.length < 4) {
       result.rhythm = allDiffs
     }
 
