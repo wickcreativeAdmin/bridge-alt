@@ -5,6 +5,7 @@
 
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core'
 import { Router } from '@angular/router'
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser'
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs'
 import { ChartRecord, CatalogStats, ScanProgress, CatalogFilter } from '../../../../src-shared/interfaces/catalog.interface.js'
 import { CatalogService } from '../../core/services/catalog.service'
@@ -34,7 +35,12 @@ export class LibraryComponent implements OnInit {
   showRemovalConfirm = false
   chartToRemove: ChartRecord | null = null
   removalError: string | null = null
+  hoveredChartId: number | null = null
 
+  // Duplicates tracking
+  showDuplicatesOnly = false
+  duplicateKeys = new Set<string>()  // Set of "artist|name" keys that have duplicates
+  
   // Filter state
   filter: CatalogFilter = {
     sortBy: 'artist',
@@ -51,12 +57,14 @@ export class LibraryComponent implements OnInit {
     private catalogService: CatalogService,
     private ref: ChangeDetectorRef,
     private router: Router,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit(): void {
     // Subscribe to service observables
     this.catalogService.charts$.subscribe(charts => {
       this.charts = charts
+      this.computeDuplicates(charts)
       this.ref.detectChanges()
     })
 
@@ -559,7 +567,7 @@ export class LibraryComponent implements OnInit {
       path: chart.path,
       songLength: chart.songLength
     }))
-    this.router.navigate(['/video'])
+    this.router.navigate(['/video-sync'])
   }
 
   goToArt(chart: ChartRecord, type: 'album' | 'background'): void {
@@ -571,7 +579,7 @@ export class LibraryComponent implements OnInit {
       path: chart.path,
       type
     }))
-    this.router.navigate(['/art'])
+    this.router.navigate(['/art-studio'])
   }
 
   goToLyrics(chart: ChartRecord): void {
@@ -584,5 +592,111 @@ export class LibraryComponent implements OnInit {
       chartType: chart.chartType
     }))
     this.router.navigate(['/lyrics'])
+  }
+
+  // ==================== Duplicates Detection ====================
+  
+  private computeDuplicates(charts: ChartRecord[]): void {
+    // Count occurrences of each artist+name combo (case insensitive)
+    const counts = new Map<string, number>()
+    
+    for (const chart of charts) {
+      const key = `${(chart.artist || '').toLowerCase().trim()}|${(chart.name || '').toLowerCase().trim()}`
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+    
+    // Store keys that have more than one occurrence
+    this.duplicateKeys.clear()
+    for (const [key, count] of counts) {
+      if (count > 1) {
+        this.duplicateKeys.add(key)
+      }
+    }
+  }
+
+  get duplicateCount(): number {
+    // Count total charts that are duplicates
+    let count = 0
+    for (const chart of this.charts) {
+      if (this.isDuplicate(chart)) {
+        count++
+      }
+    }
+    return count
+  }
+
+  isDuplicate(chart: ChartRecord): boolean {
+    const key = `${(chart.artist || '').toLowerCase().trim()}|${(chart.name || '').toLowerCase().trim()}`
+    return this.duplicateKeys.has(key)
+  }
+
+  toggleDuplicatesFilter(): void {
+    this.showDuplicatesOnly = !this.showDuplicatesOnly
+    this.ref.detectChanges()
+  }
+
+  // Get charts to display (filtered by duplicates if enabled)
+  get displayedCharts(): ChartRecord[] {
+    if (this.showDuplicatesOnly) {
+      return this.charts.filter(c => this.isDuplicate(c))
+    }
+    return this.charts
+  }
+
+  // ==================== Charter Name Rendering ====================
+  
+  renderCharterName(charter: string | null): SafeHtml {
+    if (!charter) return ''
+    
+    // Parse <color=X>text</color> or <color=#XXXXXX>text</color> tags
+    let result = charter
+    
+    // Handle <color=name>text</color> and <color=#hex>text</color>
+    result = result.replace(/<color=([^>]+)>([^<]*)<\/color>/gi, (_, color, text) => {
+      // Sanitize color value - only allow valid color names or hex codes
+      const safeColor = this.sanitizeColor(color)
+      return `<span style="color: ${safeColor}">${this.escapeHtml(text)}</span>`
+    })
+    
+    // Handle unclosed color tags like <color=orange>text (rest of string)
+    result = result.replace(/<color=([^>]+)>([^<]*)/gi, (_, color, text) => {
+      const safeColor = this.sanitizeColor(color)
+      return `<span style="color: ${safeColor}">${this.escapeHtml(text)}</span>`
+    })
+    
+    // Remove any remaining HTML tags for safety
+    result = result.replace(/<(?!\/?span)[^>]+>/g, '')
+    
+    return this.sanitizer.bypassSecurityTrustHtml(result)
+  }
+
+  private sanitizeColor(color: string): string {
+    // Allow hex colors
+    if (/^#[0-9A-Fa-f]{3,8}$/.test(color)) {
+      return color
+    }
+    
+    // Allow common color names
+    const validColors = [
+      'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'cyan', 
+      'magenta', 'white', 'black', 'gray', 'grey', 'lime', 'aqua', 'navy',
+      'teal', 'olive', 'maroon', 'silver', 'gold', 'coral', 'crimson'
+    ]
+    
+    if (validColors.includes(color.toLowerCase())) {
+      return color.toLowerCase()
+    }
+    
+    // Default to inherit if color is invalid
+    return 'inherit'
+  }
+
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
   }
 }

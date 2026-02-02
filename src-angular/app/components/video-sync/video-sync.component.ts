@@ -2,9 +2,11 @@
  * Bridge Video Sync Module - Component
  */
 
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core'
+import { ChangeDetectorRef, Component, OnInit, OnDestroy } from '@angular/core'
 import { VideoSyncService } from '../../core/services/video-sync.service'
 import { CatalogService } from '../../core/services/catalog.service'
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router'
+import { Subscription, filter } from 'rxjs'
 import { 
   YouTubeSearchResult, 
   VideoDownloadProgress,
@@ -16,7 +18,8 @@ import {
   templateUrl: './video-sync.component.html',
   standalone: false,
 })
-export class VideoSyncComponent implements OnInit {
+export class VideoSyncComponent implements OnInit, OnDestroy {
+  private routerSub: Subscription | null = null
   // Tool status
   toolsAvailable: { ytDlp: boolean; ffmpeg: boolean } | null = null
   checkingTools = true
@@ -54,6 +57,7 @@ export class VideoSyncComponent implements OnInit {
     private videoSyncService: VideoSyncService,
     private catalogService: CatalogService,
     private ref: ChangeDetectorRef,
+    private router: Router,
   ) {}
 
   ngOnInit(): void {
@@ -71,6 +75,7 @@ export class VideoSyncComponent implements OnInit {
       // Refresh chart list when download completes
       if (progress?.phase === 'complete') {
         this.loadChartsMissingVideo()
+        this.catalogService.refreshCharts()
         this.catalogService.refreshStats()
       }
     })
@@ -80,11 +85,26 @@ export class VideoSyncComponent implements OnInit {
       this.ref.detectChanges()
     })
 
+    // Listen for navigation to this route (handles route reuse)
+    this.routerSub = this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe((event: any) => {
+      if (event.urlAfterRedirects === '/video-sync') {
+        this.checkForPreselectedChart()
+      }
+    })
+
     // Initial load
     this.loadChartsMissingVideo().then(() => {
       // Check if we were navigated here with a pre-selected chart
       this.checkForPreselectedChart()
     })
+  }
+
+  ngOnDestroy(): void {
+    if (this.routerSub) {
+      this.routerSub.unsubscribe()
+    }
   }
 
   private checkForPreselectedChart(): void {

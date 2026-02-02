@@ -70,6 +70,7 @@ export class ArtStudioComponent implements OnInit {
 
       if (progress?.phase === 'complete') {
         this.loadCharts()
+        this.catalogService.refreshCharts()
         this.catalogService.refreshStats()
       }
     })

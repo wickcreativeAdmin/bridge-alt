@@ -89,6 +89,7 @@ export interface SongIniData {
 
   icon?: string
   loading_phrase?: string
+  multiplier_note?: number  // GH3-style charts use this
 
   // Any other fields
   [key: string]: string | number | undefined

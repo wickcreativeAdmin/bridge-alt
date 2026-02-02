@@ -172,8 +172,21 @@ class ChartScanner extends EventEmitter<ScannerEvents> {
       else if (lower.endsWith('.sng')) chartType = 'sng'
     }
 
+    // Detect if this is a GH3-style encrypted MIDI
+    // GH3 charts have `icon = gh3` or `multiplier_note` in song.ini
+    const isGH3Style = songIni.icon === 'gh3' || 
+                       songIni.multiplier_note !== undefined ||
+                       (songIni as any).gh3_unlock !== undefined
+
     // Parse chart file to detect available difficulty levels
-    const diffLevels = await this.parseChartDifficulties(assets.chart, chartType)
+    let diffLevels = await this.parseChartDifficulties(assets.chart, chartType)
+
+    // For GH3-style encrypted MIDIs, if parsing returned minimal results but
+    // we know instruments exist (from song.ini diff_ fields or track detection),
+    // assume all standard difficulties (E/M/H/X) are available
+    if (isGH3Style && chartType === 'mid') {
+      diffLevels = await this.parseGH3MidiDifficulties(assets.chart, songIni, diffLevels)
+    }
 
     // Get difficulties (null means not present, >= 0 means charted)
     const diff_guitar = songIni.diff_guitar ?? null
@@ -564,6 +577,158 @@ class ChartScanner extends EventEmitter<ScannerEvents> {
     result.ghlBass = sortDiffs(result.ghlBass)
 
     return result
+  }
+
+  /**
+   * Handle GH3-style encrypted MIDI files
+   * These MIDIs can't be parsed normally, so we detect instruments from
+   * track names and assume all difficulties (E/M/H/X) are present
+   */
+  private async parseGH3MidiDifficulties(
+    midiPath: string | null, 
+    songIni: SongIniData,
+    existingResult: {
+      guitar: string[]
+      bass: string[]
+      drums: string[]
+      keys: string[]
+      vocals: string[]
+      rhythm: string[]
+      ghlGuitar: string[]
+      ghlBass: string[]
+    }
+  ): Promise<typeof existingResult> {
+    const result = { ...existingResult }
+    const allDiffs = ['e', 'm', 'h', 'x']
+    
+    // If we already parsed valid difficulties, use those
+    const hasValidParse = 
+      result.guitar.length > 1 || 
+      result.bass.length > 1 || 
+      result.drums.length > 1 ||
+      result.rhythm.length > 1
+
+    if (hasValidParse) {
+      return result
+    }
+
+    // For GH3 MIDIs, detect which instrument tracks exist and assume all difficulties
+    if (midiPath) {
+      try {
+        const buffer = await fs.promises.readFile(midiPath)
+        const trackNames = this.extractMidiTrackNames(buffer)
+        
+        for (const trackName of trackNames) {
+          const lower = trackName.toLowerCase().trim()
+          
+          if (lower === 'part guitar' || lower === 't1 gems') {
+            result.guitar = allDiffs
+          } else if (lower === 'part bass') {
+            result.bass = allDiffs
+          } else if (lower === 'part drums') {
+            result.drums = allDiffs
+          } else if (lower === 'part keys') {
+            result.keys = allDiffs
+          } else if (lower === 'part vocals') {
+            result.vocals = allDiffs
+          } else if (lower === 'part rhythm') {
+            result.rhythm = allDiffs
+          } else if (lower === 'part guitar ghl') {
+            result.ghlGuitar = allDiffs
+          } else if (lower === 'part bass ghl') {
+            result.ghlBass = allDiffs
+          }
+        }
+      } catch (err) {
+        // Failed to read, fall back to song.ini hints
+      }
+    }
+
+    // Also use song.ini diff_ fields as hints
+    // diff_* = -1 means "auto-detect" or "all difficulties present"
+    if (songIni.diff_guitar !== undefined && songIni.diff_guitar >= -1 && result.guitar.length === 0) {
+      result.guitar = allDiffs
+    }
+    if (songIni.diff_bass !== undefined && songIni.diff_bass >= -1 && result.bass.length === 0) {
+      result.bass = allDiffs
+    }
+    if (songIni.diff_drums !== undefined && songIni.diff_drums >= -1 && result.drums.length === 0) {
+      result.drums = allDiffs
+    }
+    if (songIni.diff_keys !== undefined && songIni.diff_keys >= -1 && result.keys.length === 0) {
+      result.keys = allDiffs
+    }
+    if (songIni.diff_vocals !== undefined && songIni.diff_vocals >= -1 && result.vocals.length === 0) {
+      result.vocals = allDiffs
+    }
+    if (songIni.diff_rhythm !== undefined && songIni.diff_rhythm >= -1 && result.rhythm.length === 0) {
+      result.rhythm = allDiffs
+    }
+
+    return result
+  }
+
+  /**
+   * Extract track names from a MIDI file without fully parsing it
+   */
+  private extractMidiTrackNames(buffer: Buffer): string[] {
+    const trackNames: string[] = []
+    let pos = 14 // Skip MIDI header
+
+    while (pos < buffer.length - 8) {
+      if (buffer.toString('ascii', pos, pos + 4) !== 'MTrk') {
+        pos++
+        continue
+      }
+      
+      pos += 4
+      const trackLength = buffer.readUInt32BE(pos)
+      pos += 4
+      const trackEnd = pos + trackLength
+
+      // Look for track name meta event (FF 03)
+      while (pos < trackEnd && pos < buffer.length - 4) {
+        // Skip variable-length delta time
+        let byte
+        do {
+          byte = buffer[pos++]
+        } while (byte & 0x80 && pos < trackEnd)
+
+        if (pos >= trackEnd) break
+
+        const eventType = buffer[pos]
+        
+        if (eventType === 0xff) {
+          pos++
+          const metaType = buffer[pos++]
+          
+          // Read length
+          let length = 0
+          do {
+            byte = buffer[pos++]
+            length = (length << 7) | (byte & 0x7f)
+          } while (byte & 0x80 && pos < trackEnd)
+
+          // Track name (meta type 0x03)
+          if (metaType === 0x03 && length > 0 && pos + length <= buffer.length) {
+            const name = buffer.toString('ascii', pos, pos + length)
+            trackNames.push(name)
+          }
+
+          pos += length
+          
+          // Found a track name, move to next track
+          if (metaType === 0x03) break
+        } else {
+          // Skip other events - simplified, just move to next track
+          break
+        }
+      }
+
+      pos = trackEnd
+    }
+
+    return trackNames
   }
 
   private async parseSongIni(folderPath: string): Promise<SongIniData> {

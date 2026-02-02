@@ -5,6 +5,7 @@
 import { ChangeDetectorRef, Component, OnInit, ViewChild, ElementRef, OnDestroy } from '@angular/core'
 import { ChartLyricsMatch, LyricsSearchResult, LyricsDownloadProgress } from '../../../../src-shared/interfaces/lyrics.interface.js'
 import { LyricsService } from '../../core/services/lyrics.service'
+import { CatalogService } from '../../core/services/catalog.service'
 
 interface LyricLine {
   time: number  // ms
@@ -68,6 +69,7 @@ export class LyricsComponent implements OnInit, OnDestroy {
 
   constructor(
     private lyricsService: LyricsService,
+    private catalogService: CatalogService,
     private ref: ChangeDetectorRef,
   ) {}
 
@@ -271,6 +273,10 @@ export class LyricsComponent implements OnInit, OnDestroy {
           c => c.chartId !== this.selectedChart!.chartId
         )
         this.applyFilter()
+        
+        // Refresh catalog so Library tab shows updated status
+        this.catalogService.refreshCharts()
+        this.catalogService.refreshStats()
         
         // Reset offset for next chart
         this.offsetMs = 0
