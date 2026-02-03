@@ -44,6 +44,13 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
   searchResults: YouTubeSearchResult[] = []
   isSearching = false
   searchError: string | null = null
+  searchSource: 'youtube' | 'url' | 'local' = 'youtube'
+
+  // URL paste
+  pasteUrl = ''
+
+  // Local file import
+  selectedLocalFile: string | null = null
 
   // Download
   selectedVideo: YouTubeSearchResult | null = null
@@ -209,8 +216,21 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
     this.searchResults = []
     this.selectedVideo = null
     this.searchError = null
+    this.searchSource = 'youtube'
+    this.pasteUrl = ''
+    this.selectedLocalFile = null
     this.viewMode = 'search'
     this.ref.detectChanges()
+  }
+
+  getSourceName(source: string): string {
+    const names: Record<string, string> = {
+      'youtube': 'YouTube',
+      'vimeo': 'Vimeo',
+      'dailymotion': 'Dailymotion',
+      'archive': 'Archive.org',
+    }
+    return names[source] || source
   }
 
   async search(): Promise<void> {
@@ -222,11 +242,62 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
     this.ref.detectChanges()
 
     try {
-      this.searchResults = await this.videoSyncService.searchYouTube(this.searchQuery)
+      this.searchResults = await this.videoSyncService.searchVideos(this.searchQuery, 'youtube')
     } catch (err) {
       this.searchError = `Search failed: ${err}`
     } finally {
       this.isSearching = false
+      this.ref.detectChanges()
+    }
+  }
+
+  async downloadFromUrl(): Promise<void> {
+    if (!this.selectedChart || !this.pasteUrl.trim()) return
+
+    this.downloadError = null
+    this.ref.detectChanges()
+
+    try {
+      await this.videoSyncService.downloadFromUrl({
+        chartId: this.selectedChart.chartId,
+        url: this.pasteUrl.trim(),
+        outputPath: this.selectedChart.chartPath,
+      })
+      this.goBackToList()
+    } catch (err) {
+      console.error('Download failed:', err)
+    }
+  }
+
+  async selectLocalFile(): Promise<void> {
+    try {
+      const filePath = await this.videoSyncService.selectVideoFile()
+      if (filePath) {
+        this.selectedLocalFile = filePath
+        this.ref.detectChanges()
+      }
+    } catch (err) {
+      this.searchError = `Failed to select file: ${err}`
+      this.ref.detectChanges()
+    }
+  }
+
+  async importLocalFile(): Promise<void> {
+    if (!this.selectedChart || !this.selectedLocalFile) return
+
+    this.downloadError = null
+    this.ref.detectChanges()
+
+    try {
+      await this.videoSyncService.importLocalVideo({
+        chartId: this.selectedChart.chartId,
+        sourcePath: this.selectedLocalFile,
+        outputPath: this.selectedChart.chartPath,
+      })
+      this.goBackToList()
+    } catch (err) {
+      console.error('Import failed:', err)
+      this.downloadError = `Import failed: ${err}`
       this.ref.detectChanges()
     }
   }
@@ -272,6 +343,9 @@ export class VideoSyncComponent implements OnInit, OnDestroy {
     this.searchQuery = ''
     this.searchError = null
     this.downloadError = null
+    this.pasteUrl = ''
+    this.selectedLocalFile = null
+    this.searchSource = 'youtube'
     this.ref.detectChanges()
   }
 

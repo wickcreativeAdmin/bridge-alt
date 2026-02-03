@@ -42,8 +42,12 @@ const electronApi: ContextBridgeApi = {
 		catalogRemoveCharts: getInvoker('catalogRemoveCharts'),
 		// Video Sync
 		videoSearchYouTube: getInvoker('videoSearchYouTube'),
+		videoSearch: getInvoker('videoSearch'),
 		videoGetInfo: getInvoker('videoGetInfo'),
 		videoDownload: getInvoker('videoDownload'),
+		videoDownloadFromUrl: getInvoker('videoDownloadFromUrl'),
+		videoSelectLocalFile: getInvoker('videoSelectLocalFile'),
+		videoImportLocal: getInvoker('videoImportLocal'),
 		videoCancelDownload: getInvoker('videoCancelDownload'),
 		videoCheckTools: getInvoker('videoCheckTools'),
 		videoGetChartsMissingVideo: getInvoker('videoGetChartsMissingVideo'),

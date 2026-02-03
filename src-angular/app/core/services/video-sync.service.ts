@@ -138,6 +138,90 @@ export class VideoSyncService {
     }
   }
 
+  /**
+   * Search for videos across different sources
+   */
+  async searchVideos(query: string, source: string): Promise<YouTubeSearchResult[]> {
+    try {
+      return await window.electron.invoke.videoSearch([query, source])
+    } catch (err) {
+      console.error(`${source} search failed:`, err)
+      throw err
+    }
+  }
+
+  /**
+   * Download video from any URL supported by yt-dlp
+   */
+  async downloadFromUrl(options: { chartId: number; url: string; outputPath: string }): Promise<string> {
+    this.isDownloadingSubject.next(true)
+    this.downloadProgressSubject.next({
+      phase: 'downloading',
+      percent: 0,
+      message: 'Starting download from URL...',
+      chartId: options.chartId,
+    })
+
+    try {
+      const result = await window.electron.invoke.videoDownloadFromUrl(options)
+      return result
+    } catch (err) {
+      this.downloadProgressSubject.next({
+        phase: 'error',
+        percent: 0,
+        message: `Error: ${err}`,
+        chartId: options.chartId,
+      })
+      throw err
+    }
+  }
+
+  /**
+   * Open file dialog to select a local video file
+   */
+  async selectVideoFile(): Promise<string | null> {
+    try {
+      return await window.electron.invoke.videoSelectLocalFile()
+    } catch (err) {
+      console.error('Failed to select video file:', err)
+      throw err
+    }
+  }
+
+  /**
+   * Import a local video file into the chart folder
+   */
+  async importLocalVideo(options: { chartId: number; sourcePath: string; outputPath: string }): Promise<string> {
+    this.isDownloadingSubject.next(true)
+    this.downloadProgressSubject.next({
+      phase: 'converting',
+      percent: 0,
+      message: 'Importing local video...',
+      chartId: options.chartId,
+    })
+
+    try {
+      const result = await window.electron.invoke.videoImportLocal(options)
+      this.downloadProgressSubject.next({
+        phase: 'complete',
+        percent: 100,
+        message: 'Import complete',
+        chartId: options.chartId,
+      })
+      return result
+    } catch (err) {
+      this.downloadProgressSubject.next({
+        phase: 'error',
+        percent: 0,
+        message: `Import error: ${err}`,
+        chartId: options.chartId,
+      })
+      throw err
+    } finally {
+      this.isDownloadingSubject.next(false)
+    }
+  }
+
   get toolsAvailable(): { ytDlp: boolean; ffmpeg: boolean } | null {
     return this.toolsAvailableSubject.value
   }

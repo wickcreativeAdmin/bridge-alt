@@ -55,7 +55,7 @@ export class ArtStudioComponent implements OnInit {
   batchResults: { success: number; failed: number; skipped: number } | null = null
 
   // Blur setting for background generation
-  blurAmount = 50  // Default blur sigma (0-100)
+  blurAmount = 20  // Default blur sigma (0-50, 0 = no blur, 50 = heavy blur)
 
   constructor(
     private artStudioService: ArtStudioService,
@@ -305,6 +305,7 @@ export class ArtStudioComponent implements OnInit {
         chartId: this.selectedChart.chartId,
         outputPath: this.selectedChart.chartPath,
         style: this.selectedChart.hasAlbumArt ? 'blur' : 'gradient',
+        blurAmount: this.blurAmount,
       })
 
       // Remove from list and clear selection

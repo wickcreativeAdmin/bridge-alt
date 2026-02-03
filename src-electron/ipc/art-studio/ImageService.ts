@@ -250,12 +250,19 @@ class ImageService extends EventEmitter<ImageServiceEvents> {
         destPath
       ]
 
+      console.log('Creating blurred background:', { sourcePath, destPath, blurAmount, blurFilter })
       const process = spawn('ffmpeg', args)
+      
+      let stderr = ''
+      process.stderr.on('data', (data) => {
+        stderr += data.toString()
+      })
       
       process.on('close', (code) => {
         if (code === 0) {
           resolve()
         } else {
+          console.error('ffmpeg stderr:', stderr)
           reject(new Error(`ffmpeg exited with code ${code}`))
         }
       })

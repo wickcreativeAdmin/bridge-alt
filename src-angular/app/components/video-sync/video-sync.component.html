@@ -141,8 +141,21 @@
       </div>
     </div>
 
-    <!-- Search bar -->
-    <div class="join w-full mb-4">
+    <!-- Source tabs -->
+    <div class="tabs tabs-boxed mb-3 w-fit">
+      <button class="tab" [class.tab-active]="searchSource === 'youtube'" (click)="searchSource = 'youtube'">
+        <i class="bi bi-youtube mr-1"></i> YouTube Search
+      </button>
+      <button class="tab" [class.tab-active]="searchSource === 'url'" (click)="searchSource = 'url'">
+        <i class="bi bi-link-45deg mr-1"></i> Paste URL
+      </button>
+      <button class="tab" [class.tab-active]="searchSource === 'local'" (click)="searchSource = 'local'">
+        <i class="bi bi-folder2-open mr-1"></i> Local File
+      </button>
+    </div>
+
+    <!-- Search bar (for YouTube) -->
+    <div class="join w-full mb-4" *ngIf="searchSource === 'youtube'">
       <input type="text"
              class="input input-bordered join-item flex-1"
              placeholder="Search YouTube..."
@@ -156,6 +169,50 @@
         <span class="loading loading-spinner loading-sm" *ngIf="isSearching"></span>
         Search
       </button>
+    </div>
+
+    <!-- URL paste input -->
+    <div class="mb-4" *ngIf="searchSource === 'url'">
+      <div class="text-sm text-base-content/60 mb-2">
+        Paste a video URL from YouTube, Vimeo, Dailymotion, Archive.org, or any of 1000+ supported sites
+      </div>
+      <div class="join w-full">
+        <input type="text"
+               class="input input-bordered join-item flex-1"
+               placeholder="https://www.youtube.com/watch?v=... or any video URL"
+               [(ngModel)]="pasteUrl"
+               (keyup.enter)="downloadFromUrl()"
+               [disabled]="isDownloading">
+        <button class="btn btn-primary join-item" 
+                (click)="downloadFromUrl()" 
+                [disabled]="isDownloading || !pasteUrl.trim()">
+          <i class="bi bi-download" *ngIf="!isDownloading"></i>
+          <span class="loading loading-spinner loading-sm" *ngIf="isDownloading"></span>
+          Download
+        </button>
+      </div>
+    </div>
+
+    <!-- Local file import -->
+    <div class="mb-4" *ngIf="searchSource === 'local'">
+      <div class="text-sm text-base-content/60 mb-2">
+        Select a video file from your computer to copy into the chart folder
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-primary" (click)="selectLocalFile()" [disabled]="isDownloading">
+          <i class="bi bi-folder2-open"></i>
+          Choose Video File
+        </button>
+        <span class="text-sm text-base-content/60 self-center" *ngIf="selectedLocalFile">
+          {{selectedLocalFile}}
+        </span>
+      </div>
+      <div class="mt-3" *ngIf="selectedLocalFile">
+        <button class="btn btn-success" (click)="importLocalFile()" [disabled]="isDownloading">
+          <i class="bi bi-check-lg"></i>
+          Import to Chart Folder
+        </button>
+      </div>
     </div>
 
     <!-- Search error -->

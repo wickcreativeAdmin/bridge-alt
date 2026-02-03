@@ -79,23 +79,28 @@ export async function artGenerateBackground(options: BackgroundGenerateOptions):
   const db = getCatalogDb()
 
   // Get chart info if not all provided
+  const chart = db.getChart(options.chartId)
+  if (!chart) {
+    throw new Error(`Chart not found: ${options.chartId}`)
+  }
+  
   if (!options.outputPath) {
-    const chart = db.getChart(options.chartId)
-    if (!chart) {
-      throw new Error(`Chart not found: ${options.chartId}`)
-    }
     options.outputPath = chart.path
+  }
 
-    // Check for existing album art to use as base
-    if (!options.albumArtPath) {
-      const albumPath = path.join(chart.path, 'album.png')
-      const albumJpgPath = path.join(chart.path, 'album.jpg')
-      
-      if (fs.existsSync(albumPath)) {
-        options.albumArtPath = albumPath
-      } else if (fs.existsSync(albumJpgPath)) {
-        options.albumArtPath = albumJpgPath
+  // Always check for existing album art to use as base if not explicitly provided
+  if (!options.albumArtPath) {
+    try {
+      const entries = await fs.promises.readdir(chart.path)
+      for (const entry of entries) {
+        const lower = entry.toLowerCase()
+        if (lower === 'album.png' || lower === 'album.jpg' || lower === 'album.jpeg') {
+          options.albumArtPath = path.join(chart.path, entry)
+          break
+        }
       }
+    } catch (err) {
+      console.error('Failed to read chart directory for album art:', err)
     }
   }
 

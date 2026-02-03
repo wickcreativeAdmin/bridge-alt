@@ -90,12 +90,28 @@ export interface IpcInvokeEvents {
 		input: string
 		output: YouTubeSearchResult[]
 	}
+	videoSearch: {
+		input: [string, string]  // [query, source]
+		output: YouTubeSearchResult[]
+	}
 	videoGetInfo: {
 		input: string
 		output: YouTubeSearchResult | null
 	}
 	videoDownload: {
 		input: VideoDownloadOptions
+		output: string
+	}
+	videoDownloadFromUrl: {
+		input: { chartId: number; url: string; outputPath: string }
+		output: string
+	}
+	videoSelectLocalFile: {
+		input: void
+		output: string | null
+	}
+	videoImportLocal: {
+		input: { chartId: number; sourcePath: string; outputPath: string }
 		output: string
 	}
 	videoCancelDownload: {

@@ -19,12 +19,46 @@ class YouTubeService extends EventEmitter<YouTubeServiceEvents> {
   private activeDownloads: Map<string, ChildProcess> = new Map()
 
   /**
-   * Search YouTube for videos matching query
+   * Get the search prefix for different sources
    */
-  async searchVideos(query: string, maxResults: number = 10): Promise<YouTubeSearchResult[]> {
+  private getSearchPrefix(source: string, maxResults: number): string {
+    switch (source) {
+      case 'youtube':
+        return `ytsearch${maxResults}:`
+      case 'vimeo':
+        return `vmsearch${maxResults}:`
+      case 'dailymotion':
+        return `dailymotionsearch${maxResults}:`
+      case 'archive':
+        return `archiveorgsearch${maxResults}:`
+      default:
+        return `ytsearch${maxResults}:`
+    }
+  }
+
+  /**
+   * Get thumbnail URL for different sources
+   */
+  private getThumbnailUrl(data: any, source: string): string {
+    if (data.thumbnail) return data.thumbnail
+    if (data.thumbnails && data.thumbnails.length > 0) {
+      return data.thumbnails[0].url || data.thumbnails[0]
+    }
+    // Fallback for YouTube
+    if (source === 'youtube' && data.id) {
+      return `https://i.ytimg.com/vi/${data.id}/mqdefault.jpg`
+    }
+    return ''
+  }
+
+  /**
+   * Search for videos matching query across different sources
+   */
+  async searchVideos(query: string, maxResults: number = 10, source: string = 'youtube'): Promise<YouTubeSearchResult[]> {
     return new Promise((resolve, reject) => {
+      const searchPrefix = this.getSearchPrefix(source, maxResults)
       const args = [
-        `ytsearch${maxResults}:${query}`,
+        `${searchPrefix}${query}`,
         '--dump-json',
         '--flat-playlist',
         '--no-warnings',
@@ -63,9 +97,10 @@ class YouTubeService extends EventEmitter<YouTubeServiceEvents> {
                   channel: data.channel || data.uploader || 'Unknown',
                   duration: this.formatDuration(data.duration),
                   durationSeconds: data.duration || 0,
-                  thumbnailUrl: data.thumbnail || `https://i.ytimg.com/vi/${data.id}/mqdefault.jpg`,
+                  thumbnailUrl: this.getThumbnailUrl(data, source),
                   publishedAt: data.upload_date || '',
                   viewCount: data.view_count,
+                  url: data.url || data.webpage_url,  // Store full URL for non-YouTube sources
                 })
               }
             } catch {
@@ -312,6 +347,118 @@ class YouTubeService extends EventEmitter<YouTubeServiceEvents> {
           message: `Failed to run yt-dlp: ${err.message}`,
           videoId,
           chartId: options.chartId,
+        })
+        reject(new Error(`Failed to run yt-dlp: ${err.message}`))
+      })
+    })
+  }
+
+  /**
+   * Download video from any URL supported by yt-dlp
+   */
+  async downloadFromUrl(url: string, outputPath: string, chartId: number): Promise<string> {
+    const outputFile = path.join(outputPath, 'video.mp4')
+    const tempFile = path.join(outputPath, 'video_temp.mp4')
+
+    // Clean up any existing temp file
+    try {
+      await fs.promises.unlink(tempFile)
+    } catch {
+      // Ignore if doesn't exist
+    }
+
+    return new Promise((resolve, reject) => {
+      const args = [
+        url,
+        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        '-o', tempFile,
+        '--no-playlist',
+        '--merge-output-format', 'mp4',
+        '--progress',
+        '--newline',
+      ]
+
+      const process = spawn(this.ytDlpPath, args)
+      let stderrOutput = ''
+
+      this.emit('downloadProgress', {
+        phase: 'downloading',
+        percent: 0,
+        message: 'Starting download from URL...',
+        chartId,
+      })
+
+      process.stdout.on('data', (data) => {
+        const line = data.toString()
+        const match = line.match(/(\d+\.?\d*)%/)
+        if (match) {
+          const percent = parseFloat(match[1])
+          this.emit('downloadProgress', {
+            phase: 'downloading',
+            percent,
+            message: `Downloading: ${percent.toFixed(1)}%`,
+            chartId,
+          })
+        }
+      })
+
+      process.stderr.on('data', (data) => {
+        stderrOutput += data.toString()
+      })
+
+      process.on('close', async (code) => {
+        if (code !== 0) {
+          let errorMsg = 'Download failed'
+          if (stderrOutput) {
+            const lines = stderrOutput.trim().split('\n').filter(l => l.trim() && !l.includes('%'))
+            if (lines.length > 0) {
+              errorMsg = lines[lines.length - 1].substring(0, 200)
+            }
+          }
+
+          this.emit('downloadProgress', {
+            phase: 'error',
+            percent: 0,
+            message: errorMsg,
+            chartId,
+          })
+          reject(new Error(errorMsg))
+          return
+        }
+
+        // Check if temp file exists
+        try {
+          await fs.promises.access(tempFile)
+        } catch {
+          this.emit('downloadProgress', {
+            phase: 'error',
+            percent: 0,
+            message: 'Download completed but file not found',
+            chartId,
+          })
+          reject(new Error('Download completed but file not found'))
+          return
+        }
+
+        // Rename temp to final output
+        await fs.promises.rename(tempFile, outputFile)
+
+        this.emit('downloadProgress', {
+          phase: 'complete',
+          percent: 100,
+          message: 'Complete',
+          chartId,
+        })
+
+        resolve(outputFile)
+      })
+
+      process.on('error', (err) => {
+        this.emit('downloadProgress', {
+          phase: 'error',
+          percent: 0,
+          message: `Failed to run yt-dlp: ${err.message}`,
+          chartId,
         })
         reject(new Error(`Failed to run yt-dlp: ${err.message}`))
       })

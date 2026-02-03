@@ -321,6 +321,13 @@
               (click)="clearFilters()">
         <i class="bi bi-x-circle"></i> Clear
       </button>
+      
+      <!-- Blur control - always visible -->
+      <div class="flex items-center gap-2 ml-auto pl-4 border-l border-base-300">
+        <span class="text-sm">Blur:</span>
+        <input type="range" min="0" max="50" [(ngModel)]="blurAmount" class="range range-xs range-primary w-24">
+        <span class="text-sm font-mono w-6">{{blurAmount}}</span>
+      </div>
     </div>
 
     <!-- Batch controls -->
@@ -343,7 +350,7 @@
       <div class="flex items-center gap-3 pt-2 border-t border-base-300">
         <div class="flex items-center gap-2">
           <span class="text-sm">Blur:</span>
-          <input type="range" min="0" max="100" [(ngModel)]="blurAmount" class="range range-xs range-primary w-32">
+          <input type="range" min="0" max="50" [(ngModel)]="blurAmount" class="range range-xs range-primary w-32">
           <span class="text-sm font-mono w-8">{{blurAmount}}</span>
         </div>
         <div class="flex-1"></div>

@@ -4,6 +4,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
+import { dialog } from 'electron'
 import { VideoDownloadOptions, VideoDownloadProgress, YouTubeSearchResult } from '../../../src-shared/interfaces/video-sync.interface.js'
 import { getYouTubeService } from './YouTubeService.js'
 import { getCatalogDb } from '../catalog/CatalogDatabase.js'
@@ -36,6 +37,15 @@ export async function videoSearchYouTube(query: string): Promise<YouTubeSearchRe
 }
 
 /**
+ * Search multiple video sources
+ */
+export async function videoSearch([query, source]: [string, string]): Promise<YouTubeSearchResult[]> {
+  initService()
+  const ytService = getYouTubeService()
+  return ytService.searchVideos(query, 10, source)
+}
+
+/**
  * Get info about a specific video
  */
 export async function videoGetInfo(videoId: string): Promise<YouTubeSearchResult | null> {
@@ -65,6 +75,61 @@ export async function videoDownload(options: VideoDownloadOptions): Promise<stri
 
   // Update catalog to mark video as present
   // The chart scanner will pick this up on next scan, but let's update immediately
+  db.updateChartVideoStatus(options.chartId, true)
+
+  return outputFile
+}
+
+/**
+ * Download video from any URL supported by yt-dlp
+ */
+export async function videoDownloadFromUrl(options: { chartId: number; url: string; outputPath: string }): Promise<string> {
+  initService()
+  const ytService = getYouTubeService()
+  const db = getCatalogDb()
+
+  const outputFile = await ytService.downloadFromUrl(options.url, options.outputPath, options.chartId)
+
+  // Update catalog to mark video as present
+  db.updateChartVideoStatus(options.chartId, true)
+
+  return outputFile
+}
+
+/**
+ * Open file dialog to select a local video file
+ */
+export async function videoSelectLocalFile(): Promise<string | null> {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Select Video File',
+    filters: [
+      { name: 'Video Files', extensions: ['mp4', 'avi', 'webm', 'mkv', 'mov', 'wmv', 'flv'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+    properties: ['openFile'],
+  })
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null
+  }
+
+  return result.filePaths[0]
+}
+
+/**
+ * Import a local video file into the chart folder
+ */
+export async function videoImportLocal(options: { chartId: number; sourcePath: string; outputPath: string }): Promise<string> {
+  const db = getCatalogDb()
+  
+  // Determine output filename - keep original extension or use mp4
+  const ext = path.extname(options.sourcePath).toLowerCase() || '.mp4'
+  const outputFile = path.join(options.outputPath, `video${ext}`)
+
+  // Copy the file
+  await fs.promises.copyFile(options.sourcePath, outputFile)
+
+  // Update catalog to mark video as present
   db.updateChartVideoStatus(options.chartId, true)
 
   return outputFile

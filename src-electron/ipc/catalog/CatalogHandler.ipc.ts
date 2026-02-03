@@ -232,7 +232,8 @@ async function updateSongIni(chartPath: string, updates: Partial<ChartRecord>): 
       const value = updates[field as keyof ChartRecord]
       if (value === undefined || value === null) continue
 
-      const iniValue = typeof value === 'string' && value.includes(' ') ? `"${value}"` : String(value)
+      // Don't add quotes - Clone Hero handles values without them
+      const iniValue = String(value)
       const lineContent = `${iniKey} = ${iniValue}`
 
       if (existingKeys.has(iniKey.toLowerCase())) {

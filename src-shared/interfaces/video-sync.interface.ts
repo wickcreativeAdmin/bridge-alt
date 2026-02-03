@@ -11,6 +11,7 @@ export interface YouTubeSearchResult {
   thumbnailUrl: string
   publishedAt: string
   viewCount?: number
+  url?: string          // Full URL for non-YouTube sources
 }
 
 export interface VideoDownloadProgress {
