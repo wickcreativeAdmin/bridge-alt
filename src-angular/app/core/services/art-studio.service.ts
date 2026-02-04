@@ -159,6 +159,15 @@ export class ArtStudioService {
     }
   }
 
+  async getBackgroundDataUrl(chartPath: string): Promise<string | null> {
+    try {
+      return await window.electron.invoke.artGetBackgroundDataUrl({ chartPath })
+    } catch (err) {
+      console.error('Failed to get background data URL:', err)
+      return null
+    }
+  }
+
   get isProcessing(): boolean {
     return this.isProcessingSubject.value
   }

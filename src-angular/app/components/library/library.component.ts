@@ -163,6 +163,10 @@ export class LibraryComponent implements OnInit {
       this.manageFolders()
       return
     }
+    // Set immediate loading state before async operation starts
+    this.scanProgress = { phase: 'starting', current: 0, total: 0, message: 'Starting scan...' }
+    this.ref.detectChanges()
+    
     await this.catalogService.scanLibrary()
     await this.loadFilterOptions()
   }

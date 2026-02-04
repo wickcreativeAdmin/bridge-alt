@@ -182,6 +182,10 @@ export interface IpcInvokeEvents {
 		input: { chartPath: string; maxSize?: number }
 		output: string | null
 	}
+	artGetBackgroundDataUrl: {
+		input: { chartPath: string; maxSize?: number }
+		output: string | null
+	}
 	artBatchDeleteBackgrounds: {
 		input: number[]
 		output: { success: number; failed: number }

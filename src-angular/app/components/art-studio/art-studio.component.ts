@@ -11,7 +11,7 @@ import {
   ChartArtMatch 
 } from '../../../../src-shared/interfaces/art-studio.interface.js'
 
-type ViewMode = 'overview' | 'albumArt' | 'backgrounds' | 'browseAll'
+type ViewMode = 'overview' | 'albumArt' | 'backgrounds' | 'browseAll' | 'browseBackgrounds'
 
 @Component({
   selector: 'app-art-studio',
@@ -29,12 +29,19 @@ export class ArtStudioComponent implements OnInit {
   filteredBackgroundCharts: ChartArtMatch[] = []
   allChartsForBrowse: ChartArtMatch[] = []
   filteredBrowseCharts: ChartArtMatch[] = []
+  allChartsForBrowseBackgrounds: ChartArtMatch[] = []
+  filteredBrowseBackgroundCharts: ChartArtMatch[] = []
   loadingCharts = false
   browseShowMissingOnly = false
+  browseBackgroundsShowMissingOnly = false
   
   // Album art cache for browse view (chartPath -> dataUrl)
   albumArtCache: Map<string, string | null> = new Map()
   loadingArtPaths: Set<string> = new Set()
+  
+  // Background cache for browse backgrounds view (chartPath -> dataUrl)
+  backgroundCache: Map<string, string | null> = new Map()
+  loadingBackgroundPaths: Set<string> = new Set()
 
   // Filter/sort state
   filterQuery = ''
@@ -44,9 +51,13 @@ export class ArtStudioComponent implements OnInit {
   albumArtArtistOptions: string[] = []
   backgroundArtistOptions: string[] = []
   browseArtistOptions: string[] = []
+  browseBackgroundArtistOptions: string[] = []
 
   // Selected chart for single operations
   selectedChart: ChartArtMatch | null = null
+  
+  // Multi-select for browse backgrounds
+  selectedBrowseBackgroundIds = new Set<number>()
 
   // Album art search
   albumArtResults: AlbumArtResult[] = []
@@ -130,6 +141,9 @@ export class ArtStudioComponent implements OnInit {
     this.ref.detectChanges()
 
     try {
+      // Always refresh the catalog first
+      await this.catalogService.refreshCharts()
+      
       const [albumArt, backgrounds] = await Promise.all([
         this.artStudioService.getChartsMissingAlbumArt(10000),
         this.artStudioService.getChartsMissingBackground(10000),
@@ -139,6 +153,12 @@ export class ArtStudioComponent implements OnInit {
       this.buildArtistOptions()
       this.applyAlbumArtFilter()
       this.applyBackgroundFilter()
+      
+      // If in browse mode, also refresh that data and clear cache
+      if (this.viewMode === 'browseAll') {
+        this.albumArtCache.clear()
+        await this.loadAllChartsForBrowse()
+      }
     } catch (err) {
       console.error('Failed to load charts:', err)
     } finally {
@@ -148,8 +168,12 @@ export class ArtStudioComponent implements OnInit {
   }
 
   async loadAllChartsForBrowse(): Promise<void> {
-    this.loadingCharts = true
-    this.ref.detectChanges()
+    // Only set loading if not already loading (could be called from loadCharts)
+    const wasLoading = this.loadingCharts
+    if (!wasLoading) {
+      this.loadingCharts = true
+      this.ref.detectChanges()
+    }
 
     try {
       // Get all charts from the catalog service
@@ -180,8 +204,11 @@ export class ArtStudioComponent implements OnInit {
     } catch (err) {
       console.error('Failed to load charts for browse:', err)
     } finally {
-      this.loadingCharts = false
-      this.ref.detectChanges()
+      // Only clear loading if we set it
+      if (!wasLoading) {
+        this.loadingCharts = false
+        this.ref.detectChanges()
+      }
     }
   }
 
@@ -277,6 +304,251 @@ export class ArtStudioComponent implements OnInit {
     }
   }
 
+  // ==================== Browse Backgrounds Methods ====================
+
+  async loadAllChartsForBrowseBackgrounds(): Promise<void> {
+    this.loadingCharts = true
+    this.ref.detectChanges()
+
+    try {
+      const allCharts = this.catalogService.charts
+      
+      // Convert ChartRecord to ChartArtMatch format
+      this.allChartsForBrowseBackgrounds = allCharts.map(chart => ({
+        chartId: chart.id,
+        chartName: chart.name,
+        chartArtist: chart.artist,
+        chartAlbum: chart.album || '',
+        chartPath: chart.path,
+        hasAlbumArt: chart.hasAlbumArt,
+        hasBackground: chart.hasBackground,
+        suggestedQuery: `${chart.artist} ${chart.album || chart.name}`,
+      }))
+      
+      // Build artist options
+      const artists = new Set<string>()
+      this.allChartsForBrowseBackgrounds.forEach(c => {
+        if (c.chartArtist) artists.add(c.chartArtist)
+      })
+      this.browseBackgroundArtistOptions = Array.from(artists).sort((a, b) => 
+        a.toLowerCase().localeCompare(b.toLowerCase())
+      )
+      
+      this.applyBrowseBackgroundsFilter()
+    } catch (err) {
+      console.error('Failed to load charts for browse backgrounds:', err)
+    } finally {
+      this.loadingCharts = false
+      this.ref.detectChanges()
+    }
+  }
+
+  applyBrowseBackgroundsFilter(): void {
+    let result = [...this.allChartsForBrowseBackgrounds]
+
+    // Filter by missing only
+    if (this.browseBackgroundsShowMissingOnly) {
+      result = result.filter(c => !c.hasBackground)
+    }
+
+    // Filter by search query
+    if (this.filterQuery) {
+      const query = this.filterQuery.toLowerCase()
+      result = result.filter(c => 
+        c.chartName.toLowerCase().includes(query) ||
+        c.chartArtist.toLowerCase().includes(query)
+      )
+    }
+
+    // Filter by artist
+    if (this.filterArtist) {
+      result = result.filter(c => c.chartArtist === this.filterArtist)
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      const aVal = this.sortField === 'artist' ? a.chartArtist : a.chartName
+      const bVal = this.sortField === 'artist' ? b.chartArtist : b.chartName
+      const cmp = aVal.toLowerCase().localeCompare(bVal.toLowerCase())
+      return this.sortDirection === 'asc' ? cmp : -cmp
+    })
+
+    this.filteredBrowseBackgroundCharts = result
+    this.ref.detectChanges()
+    
+    // Pre-load visible backgrounds (first 50)
+    this.preloadBackgrounds(result.slice(0, 50))
+  }
+
+  /**
+   * Get background URL for a chart - returns cached data URL or triggers load
+   */
+  getBackgroundUrl(chart: ChartArtMatch): string | null {
+    if (!chart.hasBackground) return null
+    
+    // Return cached if available
+    if (this.backgroundCache.has(chart.chartPath)) {
+      return this.backgroundCache.get(chart.chartPath) || null
+    }
+    
+    // Trigger async load if not already loading
+    if (!this.loadingBackgroundPaths.has(chart.chartPath)) {
+      this.loadBackground(chart.chartPath)
+    }
+    
+    return null
+  }
+
+  /**
+   * Load background asynchronously and cache it
+   */
+  private async loadBackground(chartPath: string): Promise<void> {
+    if (this.loadingBackgroundPaths.has(chartPath)) return
+    this.loadingBackgroundPaths.add(chartPath)
+    
+    try {
+      const dataUrl = await this.artStudioService.getBackgroundDataUrl(chartPath)
+      this.backgroundCache.set(chartPath, dataUrl)
+      this.ref.detectChanges()
+    } catch (err) {
+      console.error('Failed to load background:', err)
+      this.backgroundCache.set(chartPath, null)
+    } finally {
+      this.loadingBackgroundPaths.delete(chartPath)
+    }
+  }
+
+  /**
+   * Pre-load backgrounds for a batch of charts
+   */
+  private async preloadBackgrounds(charts: ChartArtMatch[]): Promise<void> {
+    const toLoad = charts.filter(c => 
+      c.hasBackground && 
+      !this.backgroundCache.has(c.chartPath) && 
+      !this.loadingBackgroundPaths.has(c.chartPath)
+    )
+    
+    // Load in batches of 10
+    for (let i = 0; i < toLoad.length; i += 10) {
+      const batch = toLoad.slice(i, i + 10)
+      await Promise.all(batch.map(c => this.loadBackground(c.chartPath)))
+    }
+  }
+
+  /**
+   * Toggle selection for browse backgrounds multi-select
+   */
+  toggleBrowseBackgroundSelection(chartId: number): void {
+    if (this.selectedBrowseBackgroundIds.has(chartId)) {
+      this.selectedBrowseBackgroundIds.delete(chartId)
+    } else {
+      this.selectedBrowseBackgroundIds.add(chartId)
+    }
+    this.ref.detectChanges()
+  }
+
+  /**
+   * Select all visible charts in browse backgrounds
+   */
+  selectAllBrowseBackgrounds(): void {
+    if (this.selectedBrowseBackgroundIds.size === this.filteredBrowseBackgroundCharts.length) {
+      this.selectedBrowseBackgroundIds.clear()
+    } else {
+      this.filteredBrowseBackgroundCharts.forEach(c => this.selectedBrowseBackgroundIds.add(c.chartId))
+    }
+    this.ref.detectChanges()
+  }
+
+  /**
+   * Regenerate backgrounds for selected charts in browse mode
+   */
+  async regenerateSelectedBackgrounds(): Promise<void> {
+    if (this.selectedBrowseBackgroundIds.size === 0) return
+
+    const confirmed = confirm(
+      `Regenerate backgrounds for ${this.selectedBrowseBackgroundIds.size} charts with blur amount ${this.blurAmount}?\n\n` +
+      `This will delete and recreate the backgrounds.`
+    )
+    if (!confirmed) return
+
+    this.isProcessing = true
+    this.batchResults = null
+    this.ref.detectChanges()
+
+    try {
+      const result = await window.electron.invoke.artBatchRegenerateBackgrounds({
+        chartIds: Array.from(this.selectedBrowseBackgroundIds),
+        blurAmount: this.blurAmount
+      })
+      this.batchResults = result
+      
+      // Clear cache for regenerated backgrounds
+      this.selectedBrowseBackgroundIds.forEach(id => {
+        const chart = this.allChartsForBrowseBackgrounds.find(c => c.chartId === id)
+        if (chart) {
+          this.backgroundCache.delete(chart.chartPath)
+          chart.hasBackground = true
+        }
+      })
+      
+      // Reload backgrounds
+      const chartsToReload = this.filteredBrowseBackgroundCharts.filter(
+        c => this.selectedBrowseBackgroundIds.has(c.chartId)
+      )
+      this.preloadBackgrounds(chartsToReload)
+      
+      this.selectedBrowseBackgroundIds.clear()
+      this.catalogService.refreshCharts()
+      this.catalogService.refreshStats()
+    } catch (err) {
+      console.error('Batch regenerate failed:', err)
+    } finally {
+      this.isProcessing = false
+      this.ref.detectChanges()
+    }
+  }
+
+  /**
+   * Regenerate background for single selected chart
+   */
+  async regenerateSingleBackground(): Promise<void> {
+    if (!this.selectedChart) return
+
+    const chartPath = this.selectedChart.chartPath
+
+    try {
+      this.isProcessing = true
+      this.ref.detectChanges()
+      
+      await this.artStudioService.generateBackground({
+        chartId: this.selectedChart.chartId,
+        outputPath: chartPath,
+        style: this.selectedChart.hasAlbumArt ? 'blur' : 'gradient',
+        blurAmount: this.blurAmount,
+      })
+      
+      // Clear cache and reload
+      this.backgroundCache.delete(chartPath)
+      this.selectedChart.hasBackground = true
+      
+      const chartInList = this.allChartsForBrowseBackgrounds.find(c => c.chartId === this.selectedChart?.chartId)
+      if (chartInList) {
+        chartInList.hasBackground = true
+      }
+      
+      // Reload the background
+      this.loadBackground(chartPath)
+      
+      this.catalogService.refreshCharts()
+      this.catalogService.refreshStats()
+    } catch (err) {
+      console.error('Failed to regenerate background:', err)
+    } finally {
+      this.isProcessing = false
+      this.ref.detectChanges()
+    }
+  }
+
   buildArtistOptions(): void {
     const albumArtArtists = new Set<string>()
     this.chartsMissingAlbumArt.forEach(c => {
@@ -367,15 +639,18 @@ export class ArtStudioComponent implements OnInit {
     this.searchError = null
     this.batchMode = false
     this.selectedChartIds.clear()
+    this.selectedBrowseBackgroundIds.clear()
     this.batchResults = null
     this.filterQuery = ''
     this.filterArtist = ''
     this.applyAlbumArtFilter()
     this.applyBackgroundFilter()
     
-    // Load all charts when entering browse mode
+    // Load all charts when entering browse modes
     if (mode === 'browseAll') {
       this.loadAllChartsForBrowse()
+    } else if (mode === 'browseBackgrounds') {
+      this.loadAllChartsForBrowseBackgrounds()
     }
     
     this.ref.detectChanges()
@@ -421,6 +696,9 @@ export class ArtStudioComponent implements OnInit {
   async downloadAlbumArt(result: AlbumArtResult): Promise<void> {
     if (!this.selectedChart) return
 
+    const chartPath = this.selectedChart.chartPath
+    const chartId = this.selectedChart.chartId
+
     try {
       await this.artStudioService.downloadImage({
         chartId: this.selectedChart.chartId,
@@ -429,13 +707,37 @@ export class ArtStudioComponent implements OnInit {
         type: 'album',
       })
       
-      // Remove from list and clear selection
+      // Invalidate the cache for this chart so it reloads
+      this.albumArtCache.delete(chartPath)
+      
+      // Update the chart's hasAlbumArt flag in browse list
+      const chartInBrowse = this.allChartsForBrowse.find(c => c.chartId === chartId)
+      if (chartInBrowse) {
+        chartInBrowse.hasAlbumArt = true
+      }
+      
+      // Update selected chart
+      if (this.selectedChart) {
+        this.selectedChart.hasAlbumArt = true
+      }
+      
+      // Remove from missing list
       this.chartsMissingAlbumArt = this.chartsMissingAlbumArt.filter(
-        c => c.chartId !== this.selectedChart?.chartId
+        c => c.chartId !== chartId
       )
       this.applyAlbumArtFilter()
-      this.selectedChart = null
+      
+      // Clear search results but keep chart selected to show updated art
       this.albumArtResults = []
+      
+      // Refresh catalog
+      this.catalogService.refreshCharts()
+      this.catalogService.refreshStats()
+      
+      // Force reload of this chart's album art
+      this.loadAlbumArt(chartPath)
+      
+      this.ref.detectChanges()
     } catch (err) {
       console.error('Download failed:', err)
     }
@@ -590,8 +892,13 @@ export class ArtStudioComponent implements OnInit {
     const confirmed = confirm(`Delete album art for "${this.selectedChart.chartName}"?`)
     if (!confirmed) return
 
+    const chartPath = this.selectedChart.chartPath
+
     try {
       await this.artStudioService.deleteAlbumArt(this.selectedChart.chartId)
+      
+      // Clear the cache for this chart
+      this.albumArtCache.delete(chartPath)
       
       // Update the local data
       this.selectedChart.hasAlbumArt = false

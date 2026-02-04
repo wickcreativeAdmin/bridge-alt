@@ -123,6 +123,22 @@ class ImageService extends EventEmitter<ImageServiceEvents> {
       chartId,
     })
 
+    // Delete any existing files of the same type before downloading
+    try {
+      const entries = await fs.promises.readdir(outputPath)
+      for (const entry of entries) {
+        const lower = entry.toLowerCase()
+        if (type === 'album' && (lower === 'album.png' || lower === 'album.jpg' || lower === 'album.jpeg')) {
+          await fs.promises.unlink(path.join(outputPath, entry))
+        } else if (type === 'background' && lower.startsWith('background') && 
+                   (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg'))) {
+          await fs.promises.unlink(path.join(outputPath, entry))
+        }
+      }
+    } catch (err) {
+      console.error('Failed to clean up existing files:', err)
+    }
+
     return new Promise((resolve, reject) => {
       const protocol = imageUrl.startsWith('https') ? https : http
       
@@ -202,6 +218,20 @@ class ImageService extends EventEmitter<ImageServiceEvents> {
       message: 'Generating background...',
       chartId,
     })
+
+    // Delete any existing background files first
+    try {
+      const entries = await fs.promises.readdir(outputPath)
+      for (const entry of entries) {
+        const lower = entry.toLowerCase()
+        if (lower.startsWith('background') && 
+            (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg'))) {
+          await fs.promises.unlink(path.join(outputPath, entry))
+        }
+      }
+    } catch (err) {
+      console.error('Failed to clean up existing background files:', err)
+    }
 
     // Check if we have album art to work with
     if (albumArtPath && style === 'blur') {

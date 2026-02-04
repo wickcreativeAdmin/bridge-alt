@@ -13,7 +13,7 @@
 
   <!-- Overview Mode -->
   <div class="flex-1 overflow-y-auto scrollbar scrollbar-w-2 scrollbar-track-base-300 scrollbar-thumb-neutral scrollbar-thumb-rounded-full" *ngIf="viewMode === 'overview'">
-    <div class="grid grid-cols-3 gap-4">
+    <div class="grid grid-cols-4 gap-4">
       
       <!-- Album Art Card -->
       <div class="card bg-base-200 shadow-lg cursor-pointer hover:bg-base-300 transition-colors"
@@ -25,14 +25,14 @@
             </div>
             <div>
               <h3 class="card-title">Album Art</h3>
-              <p class="text-base-content/60">Fetch missing album art</p>
+              <p class="text-base-content/60 text-sm">Fetch missing</p>
             </div>
           </div>
           <div class="divider my-2"></div>
           <div class="stats bg-base-100">
             <div class="stat py-2">
               <div class="stat-value text-warning">{{chartsMissingAlbumArt.length}}</div>
-              <div class="stat-title">Missing album art</div>
+              <div class="stat-title text-xs">Missing art</div>
             </div>
           </div>
         </div>
@@ -48,14 +48,14 @@
             </div>
             <div>
               <h3 class="card-title">Backgrounds</h3>
-              <p class="text-base-content/60">Generate backgrounds</p>
+              <p class="text-base-content/60 text-sm">Generate missing</p>
             </div>
           </div>
           <div class="divider my-2"></div>
           <div class="stats bg-base-100">
             <div class="stat py-2">
               <div class="stat-value text-warning">{{chartsMissingBackground.length}}</div>
-              <div class="stat-title">Missing background</div>
+              <div class="stat-title text-xs">Missing BG</div>
             </div>
           </div>
         </div>
@@ -70,15 +70,38 @@
               <i class="bi bi-grid-3x3-gap"></i>
             </div>
             <div>
-              <h3 class="card-title">Browse All Art</h3>
-              <p class="text-base-content/60">View & replace album art</p>
+              <h3 class="card-title">Browse Art</h3>
+              <p class="text-base-content/60 text-sm">View & replace</p>
             </div>
           </div>
           <div class="divider my-2"></div>
           <div class="stats bg-base-100">
             <div class="stat py-2">
               <div class="stat-value text-info">{{catalogService.charts.length}}</div>
-              <div class="stat-title">Total charts</div>
+              <div class="stat-title text-xs">Total charts</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Browse All Backgrounds Card -->
+      <div class="card bg-base-200 shadow-lg cursor-pointer hover:bg-base-300 transition-colors"
+           (click)="setViewMode('browseBackgrounds')">
+        <div class="card-body">
+          <div class="flex items-center gap-4">
+            <div class="text-4xl text-info">
+              <i class="bi bi-grid-3x3"></i>
+            </div>
+            <div>
+              <h3 class="card-title">Browse BG</h3>
+              <p class="text-base-content/60 text-sm">View & regenerate</p>
+            </div>
+          </div>
+          <div class="divider my-2"></div>
+          <div class="stats bg-base-100">
+            <div class="stat py-2">
+              <div class="stat-value text-info">{{catalogService.charts.length}}</div>
+              <div class="stat-title text-xs">Total charts</div>
             </div>
           </div>
         </div>
@@ -577,6 +600,155 @@
       </div>
       
       <div class="text-center text-base-content/50 py-8" *ngIf="filteredBrowseCharts.length === 0 && !loadingCharts">
+        No charts match your filter
+      </div>
+      
+      <div class="text-center py-8" *ngIf="loadingCharts">
+        <span class="loading loading-spinner loading-lg"></span>
+        <div class="text-sm text-base-content/60 mt-2">Loading charts...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Browse All Backgrounds Mode -->
+  <div class="flex-1 min-h-0 flex flex-col" *ngIf="viewMode === 'browseBackgrounds'">
+    
+    <!-- Header -->
+    <div class="flex items-center gap-4 mb-4">
+      <button class="btn btn-sm btn-ghost" (click)="setViewMode('overview')">
+        <i class="bi bi-arrow-left"></i> Back
+      </button>
+      <h3 class="font-semibold flex-1">Browse All Backgrounds - {{filteredBrowseBackgroundCharts.length}} charts</h3>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="flex gap-2 mb-3 items-center flex-wrap">
+      <div class="join">
+        <input type="text"
+               placeholder="Search artist or song..."
+               class="input input-sm input-bordered join-item w-48"
+               [(ngModel)]="filterQuery"
+               (input)="applyBrowseBackgroundsFilter()">
+        <button class="btn btn-sm btn-ghost join-item" *ngIf="filterQuery" (click)="filterQuery = ''; applyBrowseBackgroundsFilter()">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+
+      <select class="select select-sm select-bordered w-40"
+              [(ngModel)]="filterArtist"
+              (change)="applyBrowseBackgroundsFilter()">
+        <option value="">All Artists</option>
+        <option *ngFor="let artist of browseBackgroundArtistOptions" [value]="artist">{{artist}}</option>
+      </select>
+
+      <label class="cursor-pointer flex items-center gap-2">
+        <input type="checkbox" class="checkbox checkbox-sm" [(ngModel)]="browseBackgroundsShowMissingOnly" (change)="applyBrowseBackgroundsFilter()">
+        <span class="text-sm">Show missing only</span>
+      </label>
+      
+      <!-- Blur control -->
+      <div class="flex items-center gap-2 ml-auto pl-4 border-l border-base-300">
+        <span class="text-sm">Blur:</span>
+        <input type="range" min="0" max="50" [(ngModel)]="blurAmount" class="range range-xs range-primary w-24">
+        <span class="text-sm font-mono w-6">{{blurAmount}}</span>
+      </div>
+    </div>
+
+    <!-- Batch controls -->
+    <div class="flex items-center gap-3 mb-3 p-3 bg-base-200 rounded-lg">
+      <button class="btn btn-sm btn-ghost" (click)="selectAllBrowseBackgrounds()">
+        {{selectedBrowseBackgroundIds.size === filteredBrowseBackgroundCharts.length ? 'Deselect All' : 'Select All'}}
+      </button>
+      <span class="text-sm text-base-content/60">{{selectedBrowseBackgroundIds.size}} selected</span>
+      <div class="flex-1"></div>
+      <button class="btn btn-sm btn-primary" 
+              (click)="regenerateSelectedBackgrounds()"
+              [disabled]="selectedBrowseBackgroundIds.size === 0 || isProcessing">
+        <i class="bi bi-arrow-repeat" [class.animate-spin]="isProcessing"></i>
+        Regenerate Selected
+      </button>
+    </div>
+
+    <!-- Batch results -->
+    <div class="alert mb-3" *ngIf="batchResults"
+         [class.alert-success]="batchResults.failed === 0"
+         [class.alert-warning]="batchResults.failed > 0">
+      <i class="bi bi-info-circle"></i>
+      <span>
+        Completed: {{batchResults.success}} success, {{batchResults.failed}} failed, {{batchResults.skipped}} skipped
+      </span>
+      <button class="btn btn-sm btn-ghost" (click)="batchResults = null">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+
+    <!-- Selected chart panel -->
+    <div class="mb-4 p-4 bg-base-200 rounded-lg" *ngIf="selectedChart">
+      <div class="flex gap-4">
+        <div class="w-48 h-28 bg-base-300 rounded flex items-center justify-center overflow-hidden">
+          <img *ngIf="selectedChart.hasBackground && getBackgroundUrl(selectedChart)"
+               [src]="getBackgroundUrl(selectedChart)"
+               class="w-full h-full object-cover"
+               alt="Current background">
+          <span *ngIf="selectedChart.hasBackground && !getBackgroundUrl(selectedChart)" class="loading loading-spinner"></span>
+          <i *ngIf="!selectedChart.hasBackground" class="bi bi-file-image text-4xl text-base-content/30"></i>
+        </div>
+        <div class="flex-1">
+          <h4 class="font-semibold">{{selectedChart.chartName}}</h4>
+          <p class="text-sm text-base-content/60">{{selectedChart.chartArtist}}</p>
+          <p class="text-xs text-base-content/40 mt-1">
+            <span *ngIf="selectedChart.hasAlbumArt" class="text-success">Has album art</span>
+            <span *ngIf="!selectedChart.hasAlbumArt" class="text-warning">No album art (will use gradient)</span>
+          </p>
+          <div class="mt-2 flex gap-2 flex-wrap items-center">
+            <button class="btn btn-sm btn-primary" (click)="regenerateSingleBackground()" [disabled]="isProcessing">
+              <i class="bi bi-arrow-repeat" [class.animate-spin]="isProcessing"></i> 
+              {{selectedChart.hasBackground ? 'Regenerate' : 'Generate'}} Background
+            </button>
+            <button class="btn btn-sm btn-ghost" (click)="selectedChart = null">
+              Cancel
+            </button>
+            <div class="flex items-center gap-2 ml-4">
+              <span class="text-xs">Blur:</span>
+              <input type="range" min="0" max="50" [(ngModel)]="blurAmount" class="range range-xs range-primary w-20">
+              <span class="text-xs font-mono">{{blurAmount}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Thumbnail Grid -->
+    <div class="flex-1 overflow-y-auto scrollbar scrollbar-w-2 scrollbar-track-base-300 scrollbar-thumb-neutral scrollbar-thumb-rounded-full">
+      <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+        <div *ngFor="let chart of filteredBrowseBackgroundCharts"
+             class="cursor-pointer rounded-lg overflow-hidden bg-base-200 hover:bg-base-300 transition-colors relative"
+             [class.ring-2]="selectedChart?.chartId === chart.chartId"
+             [class.ring-primary]="selectedChart?.chartId === chart.chartId"
+             (click)="selectChart(chart)">
+          <!-- Selection checkbox -->
+          <div class="absolute top-2 left-2 z-10" (click)="$event.stopPropagation()">
+            <input type="checkbox" 
+                   class="checkbox checkbox-sm checkbox-primary"
+                   [checked]="selectedBrowseBackgroundIds.has(chart.chartId)"
+                   (change)="toggleBrowseBackgroundSelection(chart.chartId)">
+          </div>
+          <div class="aspect-video bg-base-300 flex items-center justify-center overflow-hidden">
+            <img *ngIf="chart.hasBackground && getBackgroundUrl(chart)"
+                 [src]="getBackgroundUrl(chart)"
+                 class="w-full h-full object-cover"
+                 alt="Background">
+            <span *ngIf="chart.hasBackground && !getBackgroundUrl(chart)" class="loading loading-spinner loading-sm"></span>
+            <i *ngIf="!chart.hasBackground" class="bi bi-file-image text-3xl text-base-content/20"></i>
+          </div>
+          <div class="p-2">
+            <div class="text-xs font-medium truncate">{{chart.chartName}}</div>
+            <div class="text-xs text-base-content/60 truncate">{{chart.chartArtist}}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="text-center text-base-content/50 py-8" *ngIf="filteredBrowseBackgroundCharts.length === 0 && !loadingCharts">
         No charts match your filter
       </div>
       

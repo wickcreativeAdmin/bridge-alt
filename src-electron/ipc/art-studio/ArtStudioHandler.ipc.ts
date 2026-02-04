@@ -512,3 +512,42 @@ export async function artGetAlbumArtDataUrl(
     return null
   }
 }
+
+/**
+ * Get background as a base64 data URL
+ * Used for displaying thumbnails in the renderer without file:// protocol issues
+ */
+export async function artGetBackgroundDataUrl(
+  input: { chartPath: string; maxSize?: number }
+): Promise<string | null> {
+  const { chartPath, maxSize = 150 } = input
+  
+  try {
+    // Find the background file
+    const entries = await fs.promises.readdir(chartPath)
+    let backgroundFile: string | null = null
+    
+    for (const entry of entries) {
+      const lower = entry.toLowerCase()
+      if (lower.startsWith('background') && 
+          (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg'))) {
+        backgroundFile = path.join(chartPath, entry)
+        break
+      }
+    }
+    
+    if (!backgroundFile) return null
+    
+    // Read the file
+    const buffer = await fs.promises.readFile(backgroundFile)
+    const ext = path.extname(backgroundFile).toLowerCase()
+    const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg'
+    
+    // Convert to base64 data URL
+    const base64 = buffer.toString('base64')
+    return `data:${mimeType};base64,${base64}`
+  } catch (err) {
+    console.error('Failed to get background data URL:', err)
+    return null
+  }
+}

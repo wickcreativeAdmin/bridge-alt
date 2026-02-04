@@ -123,7 +123,7 @@ export interface ChartAssets {
 }
 
 export interface ScanProgress {
-  phase: 'discovering' | 'scanning' | 'complete' | 'error'
+  phase: 'starting' | 'discovering' | 'scanning' | 'complete' | 'error'
   current: number
   total: number
   currentPath?: string
