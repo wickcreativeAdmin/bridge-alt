@@ -430,3 +430,22 @@ async function fileExists(filePath: string): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Check if charts exist in library by artist, name, and charter
+ * Used to mark Chorus search results that are already in library
+ */
+export async function catalogCheckChartsExist(
+  charts: Array<{ artist: string; name: string; charter: string }>
+): Promise<Record<string, boolean>> {
+  const db = getCatalogDb()
+  const resultMap = db.checkChartsExist(charts)
+  
+  // Convert Map to plain object for IPC serialization
+  const result: Record<string, boolean> = {}
+  resultMap.forEach((value, key) => {
+    result[key] = value
+  })
+  
+  return result
+}

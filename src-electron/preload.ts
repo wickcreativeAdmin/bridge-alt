@@ -35,6 +35,7 @@ const electronApi: ContextBridgeApi = {
 		catalogGetStats: getInvoker('catalogGetStats'),
 		catalogUpdateChart: getInvoker('catalogUpdateChart'),
 		catalogGetDistinct: getInvoker('catalogGetDistinct'),
+		catalogCheckChartsExist: getInvoker('catalogCheckChartsExist'),
 		catalogGetRemovalFolder: getInvoker('catalogGetRemovalFolder'),
 		catalogSetRemovalFolder: getInvoker('catalogSetRemovalFolder'),
 		catalogClearRemovalFolder: getInvoker('catalogClearRemovalFolder'),

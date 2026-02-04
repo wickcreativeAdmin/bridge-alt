@@ -397,6 +397,38 @@ class CatalogDatabase {
     return this.rowToChartRecord(row)
   }
 
+  /**
+   * Check if charts exist in library by artist, name, and charter
+   * Returns a map of "artist|name|charter" -> boolean
+   */
+  checkChartsExist(charts: Array<{ artist: string; name: string; charter: string }>): Map<string, boolean> {
+    const result = new Map<string, boolean>()
+    
+    // Normalize function for comparison
+    const normalize = (s: string) => s.toLowerCase().trim()
+    
+    // Build a set of normalized keys from the input
+    const keysToCheck = new Set<string>()
+    charts.forEach(c => {
+      const key = `${normalize(c.artist)}|${normalize(c.name)}|${normalize(c.charter)}`
+      keysToCheck.add(key)
+      result.set(key, false) // Default to not found
+    })
+    
+    // Query all charts and check against our set
+    const stmt = this.db.prepare('SELECT artist, name, charter FROM charts')
+    const rows = stmt.all() as Array<{ artist: string; name: string; charter: string }>
+    
+    for (const row of rows) {
+      const key = `${normalize(row.artist || '')}|${normalize(row.name || '')}|${normalize(row.charter || '')}`
+      if (keysToCheck.has(key)) {
+        result.set(key, true)
+      }
+    }
+    
+    return result
+  }
+
   private rowToChartRecord(row: Record<string, unknown>): ChartRecord {
     return {
       id: row.id as number,

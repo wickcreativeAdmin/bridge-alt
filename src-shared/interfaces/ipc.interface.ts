@@ -85,6 +85,10 @@ export interface IpcInvokeEvents {
 		input: 'artist' | 'charter' | 'genre' | 'album'
 		output: string[]
 	}
+	catalogCheckChartsExist: {
+		input: Array<{ artist: string; name: string; charter: string }>
+		output: Record<string, boolean>
+	}
 	// Video Sync
 	videoSearchYouTube: {
 		input: string

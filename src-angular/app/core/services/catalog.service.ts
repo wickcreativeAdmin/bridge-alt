@@ -265,4 +265,27 @@ export class CatalogService {
       return { success: 0, failed: ids.length, errors: [String(err)] }
     }
   }
+
+  /**
+   * Check if charts exist in library by artist, name, and charter
+   * Used to mark Chorus search results that are already in library
+   */
+  async checkChartsExist(
+    charts: Array<{ artist: string; name: string; charter: string }>
+  ): Promise<Record<string, boolean>> {
+    try {
+      return await window.electron.invoke.catalogCheckChartsExist(charts)
+    } catch (err) {
+      console.error('Failed to check charts existence:', err)
+      return {}
+    }
+  }
+
+  /**
+   * Generate a key for chart existence lookup
+   * Matches the format used by checkChartsExist
+   */
+  getChartExistenceKey(artist: string, name: string, charter: string): string {
+    return `${artist.toLowerCase().trim()}|${name.toLowerCase().trim()}|${charter.toLowerCase().trim()}`
+  }
 }
