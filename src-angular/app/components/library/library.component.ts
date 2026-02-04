@@ -9,6 +9,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser'
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs'
 import { ChartRecord, CatalogStats, ScanProgress, CatalogFilter } from '../../../../src-shared/interfaces/catalog.interface.js'
 import { CatalogService } from '../../core/services/catalog.service'
+import { ArtStudioService } from '../../core/services/art-studio.service'
 
 @Component({
   selector: 'app-library',
@@ -41,6 +42,10 @@ export class LibraryComponent implements OnInit {
   showDuplicatesOnly = false
   duplicateKeys = new Set<string>()  // Set of "artist|name" keys that have duplicates
   
+  // Album art preview cache (path -> dataUrl)
+  albumArtCache: Map<string, string | null> = new Map()
+  loadingArtPaths: Set<string> = new Set()
+  
   // Filter state
   filter: CatalogFilter = {
     sortBy: 'artist',
@@ -55,6 +60,7 @@ export class LibraryComponent implements OnInit {
 
   constructor(
     private catalogService: CatalogService,
+    private artStudioService: ArtStudioService,
     private ref: ChangeDetectorRef,
     private router: Router,
     private sanitizer: DomSanitizer,
@@ -190,7 +196,7 @@ export class LibraryComponent implements OnInit {
     return this.filter.sortDirection === 'asc' ? ' ▲' : ' ▼'
   }
 
-  filterByAsset(asset: 'video' | 'background' | 'albumArt', hasAsset: boolean | undefined): void {
+  filterByAsset(asset: 'video' | 'background' | 'albumArt' | 'lyrics', hasAsset: boolean | undefined): void {
     switch (asset) {
       case 'video':
         this.catalogService.setFilter({ hasVideo: hasAsset })
@@ -200,6 +206,9 @@ export class LibraryComponent implements OnInit {
         break
       case 'albumArt':
         this.catalogService.setFilter({ hasAlbumArt: hasAsset })
+        break
+      case 'lyrics':
+        this.catalogService.setFilter({ hasLyrics: hasAsset })
         break
     }
   }
@@ -477,6 +486,10 @@ export class LibraryComponent implements OnInit {
     return this.stats ? this.stats.totalCharts - this.stats.withAlbumArt : 0
   }
 
+  get missingLyricsCount(): number {
+    return this.stats ? this.stats.totalCharts - this.stats.withLyrics : 0
+  }
+
   get scanProgressPercent(): number {
     if (!this.scanProgress || this.scanProgress.total === 0) return 0
     return Math.round((this.scanProgress.current / this.scanProgress.total) * 100)
@@ -698,5 +711,55 @@ export class LibraryComponent implements OnInit {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;')
+  }
+
+  /**
+   * Strip HTML tags from charter names for dropdown display
+   */
+  stripHtmlTags(text: string): string {
+    if (!text) return ''
+    // Remove <color=X>...</color> tags and any other HTML
+    return text
+      .replace(/<color=[^>]*>/gi, '')
+      .replace(/<\/color>/gi, '')
+      .replace(/<[^>]*>/g, '')
+  }
+
+  /**
+   * Get album art URL for a chart - returns cached data URL or triggers load
+   */
+  getAlbumArtUrl(chart: ChartRecord): string | null {
+    if (!chart.hasAlbumArt) return null
+    
+    // Return cached if available
+    if (this.albumArtCache.has(chart.path)) {
+      return this.albumArtCache.get(chart.path) || null
+    }
+    
+    // Trigger async load if not already loading
+    if (!this.loadingArtPaths.has(chart.path)) {
+      this.loadAlbumArt(chart.path)
+    }
+    
+    return null // Will show placeholder until loaded
+  }
+
+  /**
+   * Load album art asynchronously and cache it
+   */
+  private async loadAlbumArt(chartPath: string): Promise<void> {
+    if (this.loadingArtPaths.has(chartPath)) return
+    this.loadingArtPaths.add(chartPath)
+    
+    try {
+      const dataUrl = await this.artStudioService.getAlbumArtDataUrl(chartPath)
+      this.albumArtCache.set(chartPath, dataUrl)
+      this.ref.detectChanges()
+    } catch (err) {
+      console.error('Failed to load album art:', err)
+      this.albumArtCache.set(chartPath, null)
+    } finally {
+      this.loadingArtPaths.delete(chartPath)
+    }
   }
 }

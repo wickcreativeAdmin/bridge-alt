@@ -63,6 +63,7 @@ const electronApi: ContextBridgeApi = {
 		artBatchGenerateBackgrounds: getInvoker('artBatchGenerateBackgrounds'),
 		artDeleteBackground: getInvoker('artDeleteBackground'),
 		artDeleteAlbumArt: getInvoker('artDeleteAlbumArt'),
+		artGetAlbumArtDataUrl: getInvoker('artGetAlbumArtDataUrl'),
 		artBatchDeleteBackgrounds: getInvoker('artBatchDeleteBackgrounds'),
 		artBatchRegenerateBackgrounds: getInvoker('artBatchRegenerateBackgrounds'),
 		// Video batch and delete

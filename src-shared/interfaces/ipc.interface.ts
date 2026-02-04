@@ -178,6 +178,10 @@ export interface IpcInvokeEvents {
 		input: number
 		output: { success: boolean; error?: string }
 	}
+	artGetAlbumArtDataUrl: {
+		input: { chartPath: string; maxSize?: number }
+		output: string | null
+	}
 	artBatchDeleteBackgrounds: {
 		input: number[]
 		output: { success: number; failed: number }

@@ -1,7 +1,7 @@
 import { IpcInvokeHandlers, IpcToMainEmitHandlers } from '../src-shared/interfaces/ipc.interface.js'
 import { catalogGetCharts, catalogGetChart, catalogGetDistinct, catalogGetLibraryPaths, catalogAddLibraryPath, catalogRemoveLibraryPath, catalogGetStats, catalogOpenFolder, catalogScan, catalogUpdateChart, catalogGetRemovalFolder, catalogSetRemovalFolder, catalogClearRemovalFolder, catalogRemoveChart, catalogRemoveCharts } from './ipc/catalog/CatalogHandler.ipc.js'
 import { videoSearchYouTube, videoSearch, videoGetInfo, videoDownload, videoDownloadFromUrl, videoSelectLocalFile, videoImportLocal, videoCancelDownload, videoCheckTools, videoGetChartsMissingVideo, videoBuildSearchQuery, videoBatchDownload, videoDeleteFromChart } from './ipc/video-sync/VideoSyncHandler.ipc.js'
-import { artSearchAlbumArt, artDownloadImage, artGenerateBackground, artGetChartsMissingAlbumArt, artGetChartsMissingBackground, artCheckChartAssets, artBatchFetchAlbumArt, artBatchGenerateBackgrounds, artDeleteBackground, artDeleteAlbumArt, artBatchDeleteBackgrounds, artBatchRegenerateBackgrounds } from './ipc/art-studio/ArtStudioHandler.ipc.js'
+import { artSearchAlbumArt, artDownloadImage, artGenerateBackground, artGetChartsMissingAlbumArt, artGetChartsMissingBackground, artCheckChartAssets, artBatchFetchAlbumArt, artBatchGenerateBackgrounds, artDeleteBackground, artDeleteAlbumArt, artBatchDeleteBackgrounds, artBatchRegenerateBackgrounds, artGetAlbumArtDataUrl } from './ipc/art-studio/ArtStudioHandler.ipc.js'
 import { lyricsSearch, lyricsGet, lyricsGetById, lyricsDownload, lyricsGetChartsMissing, lyricsBatchDownload, lyricsCheckChart, lyricsDelete, lyricsGetAudioPath } from './ipc/lyrics/LyricsHandler.ipc.js'
 import { download } from './ipc/DownloadHandler.ipc.js'
 import { scanIssues } from './ipc/issue-scan/IssueScanHandler.ipc.js'
@@ -56,6 +56,7 @@ export function getIpcInvokeHandlers(): IpcInvokeHandlers {
 		artBatchGenerateBackgrounds,
 		artDeleteBackground,
 		artDeleteAlbumArt,
+		artGetAlbumArtDataUrl,
 		artBatchDeleteBackgrounds,
 		artBatchRegenerateBackgrounds,
 		// Video batch and delete

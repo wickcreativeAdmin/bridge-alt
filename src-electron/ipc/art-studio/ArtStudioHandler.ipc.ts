@@ -474,3 +474,41 @@ export async function artBatchRegenerateBackgrounds(
 
   return { success, failed, skipped }
 }
+
+/**
+ * Get album art as a base64 data URL
+ * Used for displaying thumbnails in the renderer without file:// protocol issues
+ */
+export async function artGetAlbumArtDataUrl(
+  input: { chartPath: string; maxSize?: number }
+): Promise<string | null> {
+  const { chartPath, maxSize = 150 } = input
+  
+  try {
+    // Find the album art file
+    const entries = await fs.promises.readdir(chartPath)
+    let albumArtFile: string | null = null
+    
+    for (const entry of entries) {
+      const lower = entry.toLowerCase()
+      if (lower === 'album.png' || lower === 'album.jpg' || lower === 'album.jpeg') {
+        albumArtFile = path.join(chartPath, entry)
+        break
+      }
+    }
+    
+    if (!albumArtFile) return null
+    
+    // Read the file
+    const buffer = await fs.promises.readFile(albumArtFile)
+    const ext = path.extname(albumArtFile).toLowerCase()
+    const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg'
+    
+    // Convert to base64 data URL
+    const base64 = buffer.toString('base64')
+    return `data:${mimeType};base64,${base64}`
+  } catch (err) {
+    console.error('Failed to get album art data URL:', err)
+    return null
+  }
+}

@@ -140,6 +140,25 @@ export class ArtStudioService {
     }
   }
 
+  async deleteAlbumArt(chartId: number): Promise<boolean> {
+    try {
+      const result = await window.electron.invoke.artDeleteAlbumArt(chartId)
+      return result.success
+    } catch (err) {
+      console.error('Failed to delete album art:', err)
+      return false
+    }
+  }
+
+  async getAlbumArtDataUrl(chartPath: string): Promise<string | null> {
+    try {
+      return await window.electron.invoke.artGetAlbumArtDataUrl({ chartPath })
+    } catch (err) {
+      console.error('Failed to get album art data URL:', err)
+      return null
+    }
+  }
+
   get isProcessing(): boolean {
     return this.isProcessingSubject.value
   }

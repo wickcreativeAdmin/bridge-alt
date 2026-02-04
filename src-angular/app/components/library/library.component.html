@@ -33,7 +33,7 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-5 gap-3 mb-4" *ngIf="stats && stats.totalCharts > 0">
+  <div class="grid grid-cols-6 gap-3 mb-4" *ngIf="stats && stats.totalCharts > 0">
     <div class="stats shadow bg-base-200 cursor-pointer hover:bg-base-300" (click)="clearFilters()">
       <div class="stat py-2 px-4">
         <div class="stat-value text-lg">{{stats.totalCharts}}</div>
@@ -65,6 +65,15 @@
       <div class="stat py-2 px-4">
         <div class="stat-value text-lg text-warning">{{missingAlbumArtCount}}</div>
         <div class="stat-title text-xs">No Art</div>
+      </div>
+    </div>
+    <div class="stats shadow cursor-pointer hover:bg-base-300"
+         [class.bg-primary]="filter.hasLyrics === false"
+         [class.bg-base-200]="filter.hasLyrics !== false"
+         (click)="filterByAsset('lyrics', filter.hasLyrics === false ? undefined : false)">
+      <div class="stat py-2 px-4">
+        <div class="stat-value text-lg text-warning">{{missingLyricsCount}}</div>
+        <div class="stat-title text-xs">No Lyrics</div>
       </div>
     </div>
     <div class="stats shadow cursor-pointer hover:bg-base-300"
@@ -105,7 +114,7 @@
     </select>
     <select class="select select-sm select-bordered w-36" [value]="filter.charter || ''" (change)="filterByCharter($any($event.target).value)">
       <option value="">All Charters</option>
-      <option *ngFor="let charter of charterOptions" [value]="charter">{{charter}}</option>
+      <option *ngFor="let charter of charterOptions" [value]="charter">{{stripHtmlTags(charter)}}</option>
     </select>
     <select class="select select-sm select-bordered w-28" [value]="filter.chartType || ''" (change)="filterByChartType($any($event.target).value)">
       <option value="">All Types</option>
@@ -244,7 +253,22 @@
             <button *ngIf="!chart.hasBackground" class="btn btn-xs btn-ghost text-error" (click)="goToArt(chart, 'background')" title="No background - click to add">✗</button>
           </td>
           <td [style.background-color]="hoveredChartId === chart.id && !isSelected(chart) ? '#000' : null" class="text-center">
-            <button *ngIf="chart.hasAlbumArt" class="btn btn-xs btn-ghost text-success" (click)="deleteAlbumArt(chart)" title="Has album art - click to delete">✓</button>
+            <div class="relative inline-block group" *ngIf="chart.hasAlbumArt">
+              <button class="btn btn-xs btn-ghost text-success" (click)="deleteAlbumArt(chart)" title="Has album art - click to delete">✓</button>
+              <!-- Album art preview tooltip -->
+              <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
+                <div class="bg-base-300 rounded-lg shadow-xl p-1 border border-base-content/20">
+                  <img *ngIf="getAlbumArtUrl(chart)"
+                       [src]="getAlbumArtUrl(chart)" 
+                       class="w-32 h-32 object-cover rounded"
+                       alt="Album art">
+                  <div *ngIf="!getAlbumArtUrl(chart)" class="w-32 h-32 flex items-center justify-center">
+                    <span class="loading loading-spinner"></span>
+                  </div>
+                </div>
+                <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-base-300"></div>
+              </div>
+            </div>
             <button *ngIf="!chart.hasAlbumArt" class="btn btn-xs btn-ghost text-error" (click)="goToArt(chart, 'album')" title="No album art - click to add">✗</button>
           </td>
           <td [style.background-color]="hoveredChartId === chart.id && !isSelected(chart) ? '#000' : null" class="text-center">
