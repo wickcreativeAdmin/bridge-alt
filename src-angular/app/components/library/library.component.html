@@ -255,18 +255,19 @@
           <td [style.background-color]="hoveredChartId === chart.id && !isSelected(chart) ? '#000' : null" class="text-center">
             <div class="relative inline-block group" *ngIf="chart.hasAlbumArt">
               <button class="btn btn-xs btn-ghost text-success" (click)="deleteAlbumArt(chart)" title="Has album art - click to delete">✓</button>
-              <!-- Album art preview tooltip -->
-              <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
-                <div class="bg-base-300 rounded-lg shadow-xl p-1 border border-base-content/20">
+              <!-- Album art preview tooltip - appears below to avoid overflow clipping -->
+              <div class="absolute left-1/2 -translate-x-1/2 top-full mt-1 hidden group-hover:block pointer-events-none"
+                   style="z-index: 9999;">
+                <div class="absolute bottom-full left-1/2 -translate-x-1/2 border-8 border-transparent border-b-base-300"></div>
+                <div class="bg-base-300 rounded-lg shadow-2xl p-1 border border-base-content/20" style="width: 136px; height: 136px;">
                   <img *ngIf="getAlbumArtUrl(chart)"
                        [src]="getAlbumArtUrl(chart)" 
-                       class="w-32 h-32 object-cover rounded"
+                       style="width: 128px; height: 128px; object-fit: cover; border-radius: 4px;"
                        alt="Album art">
-                  <div *ngIf="!getAlbumArtUrl(chart)" class="w-32 h-32 flex items-center justify-center">
+                  <div *ngIf="!getAlbumArtUrl(chart)" style="width: 128px; height: 128px; display: flex; align-items: center; justify-content: center;">
                     <span class="loading loading-spinner"></span>
                   </div>
                 </div>
-                <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-base-300"></div>
               </div>
             </div>
             <button *ngIf="!chart.hasAlbumArt" class="btn btn-xs btn-ghost text-error" (click)="goToArt(chart, 'album')" title="No album art - click to add">✗</button>
